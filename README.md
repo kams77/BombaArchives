@@ -37,11 +37,12 @@ Le bouton « Sauvegarder ou restaurer la démo » permet de copier les données 
 | Copies certifiées | Copies avec code unique et QR code, vérification d'authenticité, révocation |
 | Rapports | Consultations, documents les plus consultés, activité par utilisateur, export CSV |
 | Corbeille | Restauration ; suppression définitive bloquée tant que la conservation court |
-| Utilisateurs | Rôles, accès par service, double authentification |
+| Organisation | Identité, plan de classement (services), étiquettes, modèles de fiches d'indexation, politique de connexion |
+| Utilisateurs | Invitations, suspension, réinitialisation du mot de passe, fermeture des sessions, dernière activité, rôles et accès par service, double authentification |
 | Circuits de validation | Étapes de validation et de signature par type de document, avec délais et relances |
 | Sécurité | Score de sécurité, règles d'accès, sauvegardes 3-2-1, liens de partage |
 | Intégrations | Scanner, e-mail, WhatsApp, Microsoft 365, Google Drive, API |
-| Journal d'audit | Trace de chaque action |
+| Journal d'audit | Trace de chaque action, filtres par période et par personne, recherche, export pour Excel |
 
 ### Espace Bomba (prestataire)
 
@@ -52,11 +53,11 @@ Le bouton « Sauvegarder ou restaurer la démo » permet de copier les données 
 | Lots et production | Les 7 étapes de numérisation, avec contrôle qualité |
 | Missions | Collectes, livraisons, sessions sur site, par équipe et véhicule |
 | Magasin d'archives | Emplacement et suivi de chaque carton |
-| Clients | Fiche et chiffres de chaque client |
-| Facturation | Factures mensuelles, paiements M-Pesa, Orange Money, Airtel Money ou virement |
+| Clients | Fiche et chiffres de chaque client, suspension du compte (consultation seule) et réactivation |
+| Facturation | Factures mensuelles, paiements M-Pesa, Orange Money, Airtel Money ou virement, relances selon la politique de recouvrement |
 | Dépenses et marge | Dépenses par poste et résultat mensuel |
 | Devis | Chiffrage d'un projet |
-| Paramètres | Tarifs, formules d'abonnement, référentiel de conservation |
+| Paramètres | Tarifs, formules d'abonnement, référentiel de conservation, identité de l'entreprise, coordonnées de paiement, taux du jour, politique de recouvrement, équipe Bomba |
 
 ## Comptes de démonstration
 

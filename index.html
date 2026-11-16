@@ -450,6 +450,9 @@ table.dt tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-
 [aria-invalid="true"]{border-color:var(--danger)!important;box-shadow:0 0 0 3px var(--danger-soft)}
 .err{color:var(--danger);font-size:12px;font-weight:500}
 .toast{display:flex;gap:14px;align-items:center}
+.notice.danger{background:var(--danger-soft)}
+input[type=email],input[type=tel]{background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:8px 10px;min-width:0;max-width:100%}
+.notice.danger svg{stroke:var(--danger)}
 .toast[hidden],[hidden]{display:none!important}
 .toast-undo{background:none;border:0;color:var(--bg);font-weight:600;text-decoration:underline;text-underline-offset:2px;cursor:pointer;padding:0;font-size:inherit}
 @media (max-width:900px){
@@ -568,15 +571,15 @@ const NOTICE = t => `<div class="notice">${ico("info","")}<div>${t}</div></div>`
 const NAV = {
   tableau:["Tableau de bord","grid"], taches:["Mes tâches","check"], archives:["Archives","archive"], capture:["Boîte de dépôt","tray"], ajouter:["Nouveau document","upload"], courrier:["Courrier","mail"],
   demandes:["Demandes","inbox"], conservation:["Conservation","hourglass"], certificats:["Copies certifiées","seal"], rapports:["Rapports","chart"], corbeille:["Corbeille","trash"],
-  utilisateurs:["Utilisateurs","users"], circuits:["Circuits de validation","flow"], securite:["Sécurité","shield"], integrations:["Intégrations","plug"], journal:["Journal d'audit","journal"],
+  organisation:["Organisation","building"], utilisateurs:["Utilisateurs","users"], circuits:["Circuits de validation","flow"], securite:["Sécurité","shield"], integrations:["Intégrations","plug"], journal:["Journal d'audit","journal"],
   pilotage:["Pilotage","chart"], prospects:["Prospects","target"], lots:["Lots et production","scanner"], missions:["Missions","truck"], magasin:["Magasin d'archives","shelves"], clients:["Clients","building"],
   facturation:["Facturation","receipt"], depenses:["Dépenses et marge","wallet"], devis:["Devis","calc"], parametres:["Paramètres","sliders"]
 };
 const GROUPS = {
-  client:[["Travail",["tableau","taches","archives","capture","courrier"]],["Gestion",["demandes","conservation","certificats","rapports","corbeille"]],["Administration",["utilisateurs","circuits","securite","integrations","journal"]]],
+  client:[["Travail",["tableau","taches","archives","capture","courrier"]],["Gestion",["demandes","conservation","certificats","rapports","corbeille"]],["Administration",["organisation","utilisateurs","circuits","securite","integrations","journal"]]],
   bomba:[["Activité",["pilotage","prospects","lots","missions","magasin"]],["Finances",["clients","facturation","depenses","devis"]],["Configuration",["parametres"]]]
 };
-const MODES = {client:["tableau","taches","archives","capture","ajouter","courrier","demandes","conservation","certificats","rapports","corbeille","utilisateurs","circuits","securite","integrations","journal"],
+const MODES = {client:["tableau","taches","archives","capture","ajouter","courrier","demandes","conservation","certificats","rapports","corbeille","organisation","utilisateurs","circuits","securite","integrations","journal"],
   bomba:["pilotage","prospects","lots","missions","magasin","clients","facturation","depenses","devis","parametres"]};
 
 const $ = s => document.querySelector(s);
@@ -941,7 +944,7 @@ const actor = () => mode() === "bomba" ? "Équipe Bomba" : me().nom;
 const svcNames = c => c.services.map(s => s[0]);
 const userSvcs = u => u.role === "Administrateur" ? svcNames(clientById(u.client)) : u.services;
 const isAdmin = u => u.role === "Administrateur";
-const canEdit = u => u.role !== "Lecteur";
+const canEdit = u => u.role !== "Lecteur" && !(clientById(u.client) || {}).suspendu && (u.statut || "Actif") === "Actif";
 const hasGrant = (u, d) => S.grants.some(g => g.user === u.id && g.doc === d.id && new Date(g.until) > TODAY);
 const canList = (d, u) => d.client === u.client && d.statut !== "elimine" && d.statut !== "corbeille" && userSvcs(u).includes(d.service) && ((d.statut !== "en_validation" && d.statut !== "rejete") || isAdmin(u) || d.par === u.nom || S.flows.some(f => f.doc === d.id && canAct(f, u)));
 const canRead = (d, u) => canList(d, u) && (!d.conf || u.role !== "Lecteur" || hasGrant(u, d));
@@ -1508,7 +1511,7 @@ function vClients(){
     return `<article class="panel client-card"><div class="lot-head"><div><div class="eyebrow">${esc(c.secteur)} · ${esc(c.commune)}</div><h3>${esc(c.nom)}</h3></div><span class="chip acc">${esc(c.formule)} · ${f.prix} $</span></div>` +
       `<div class="small muted">Contact : ${esc(c.contact)} · <span class="mono">${esc(c.tel)}</span><br>Client depuis le ${fmtDate(c.depuis)} · code <span class="mono">${esc(c.code)}</span></div>` +
       `<div class="kv"><div><span class="muted">Utilisateurs</span><b>${s.users}</b></div><div><span class="muted">Pages numérisées</span><b>${nf(s.pages)}</b></div><div><span class="muted">Cartons en garde</span><b>${s.garde}</b></div><div><span class="muted">Encaissé</span><b>${usd0(s.enc)}</b></div></div>` +
-      `<div class="inline" style="justify-content:space-between">${s.due ? `<span class="chip ${s.late ? "over" : "soon"}">${usd(s.due)} à encaisser</span>` : '<span class="chip ok">À jour</span>'}<div class="inline"><button class="btn sm" type="button" data-act="client-inv" data-id="${c.id}">Factures</button><button class="btn sm primary" type="button" data-act="open-client" data-id="${c.id}">Ouvrir son espace</button></div></div></article>`;
+      `<div class="inline" style="justify-content:space-between"><div class="inline" style="gap:6px">${c.suspendu ? `<span class="chip over">Suspendu · ${esc(c.suspendu.motif)}</span>` : ""}${s.due ? `<span class="chip ${s.late ? "over" : "soon"}">${usd(s.due)} à encaisser</span>` : '<span class="chip ok">À jour</span>'}${suspReco(c) ? '<span class="chip over">Suspension recommandée</span>' : ""}</div><div class="inline">${c.suspendu ? `<button class="btn sm" type="button" data-act="client-react" data-id="${c.id}">Réactiver</button>` : `<button class="btn sm ghost-danger" type="button" data-act="client-susp" data-id="${c.id}">Suspendre</button>`}<button class="btn sm" type="button" data-act="client-inv" data-id="${c.id}">Factures</button><button class="btn sm primary" type="button" data-act="open-client" data-id="${c.id}">Ouvrir son espace</button></div></div></article>`;
   }).join("") + '</div>';
   h += '<details class="panel mt"><summary>Ajouter un client</summary><form id="client-form"><div class="fgrid three">';
   h += '<div class="field"><label for="nc-nom">Nom de l\'organisation</label><input id="nc-nom" type="text" placeholder="Ex. ONG Bana na Biso"></div>';
@@ -1558,9 +1561,11 @@ function vFacturation(){
     `<label class="small muted" for="fac-statut">Statut</label><select id="fac-statut">${["all","En attente","En retard","Payée"].map(s => opt(s, s === "all" ? "Tous" : s, UI.facStatut === s)).join("")}</select></div>` +
     `<button class="btn primary" type="button" data-act="gen"${done ? " disabled" : ""}>${done ? "Factures de " + mLabel + " générées" : "Générer les factures de " + mLabel}</button></div>`;
   h += '<div class="tbl"><table><thead><tr><th>N°</th><th>Client</th><th>Date</th><th>Échéance</th><th class="r">Montant</th><th>Statut</th><th></th></tr></thead><tbody>';
-  h += list.length ? list.map(i => `<tr><td class="nowrap"><span class="mono">${esc(i.id)}</span></td><td>${esc(clientById(i.client).nom)}<div class="small muted">${esc(i.lignes[0][0])}</div></td><td class="nowrap">${fmtDate(i.date)}</td><td class="nowrap">${fmtDate(i.ech)}</td><td class="r nowrap">${usd(invTotal(i))}</td><td>${invChip(invState(i))}</td><td><button class="btn sm" type="button" data-act="inv-open" data-id="${i.id}">Voir</button></td></tr>`).join("") : '<tr><td colspan="7" class="empty">Aucune facture.</td></tr>';
+  h += list.length ? list.map(i => `<tr><td class="nowrap"><span class="mono">${esc(i.id)}</span></td><td>${esc(clientById(i.client).nom)}<div class="small muted">${esc(i.lignes[0][0])}</div></td><td class="nowrap">${fmtDate(i.date)}</td><td class="nowrap">${fmtDate(i.ech)}</td><td class="r nowrap">${usd(invTotal(i))}</td><td><div class="acts">${invChip(invState(i))}${dunChip(i)}</div></td><td><button class="btn sm" type="button" data-act="inv-open" data-id="${i.id}">Voir</button></td></tr>`).join("") : '<tr><td colspan="7" class="empty">Aucune facture.</td></tr>';
   h += '</tbody></table></div>';
   h += NOTICE("La génération mensuelle facture l'abonnement de chaque client, la garde des cartons et les pages des lots mis en ligne non encore facturées, moins les acomptes déjà versés.");
+  const rp = recouv();
+  h += '<div class="mt">' + NOTICE(`Politique de recouvrement : 1re relance ${rp.r1} jours après l'échéance, 2e relance à ${rp.r2} jours, suspension recommandée à ${rp.susp} jours. Modifiable dans Paramètres.`) + '</div>';
   return h;
 }
 function genMonth(){
@@ -1577,7 +1582,7 @@ function genMonth(){
       if (l.acompte) { lignes.push([`Déduction de l'acompte versé – ${l.id}`, 1, -l.acompte]); l.acompte = 0; }
     });
     const id = "FAC-" + TODAY.getFullYear() + "-" + String(S.invSeq++).padStart(3, "0");
-    S.invoices.push({id, client:c.id, date:isoDay(TODAY), ech:isoDay(addDays(TODAY, 15)), lignes, paye:null, mensuel:true, mois:mk});
+    S.invoices.push({id, client:c.id, date:isoDay(TODAY), ech:isoDay(addDays(TODAY, recouv().delai)), lignes, paye:null, mensuel:true, mois:mk});
     n++;
   });
   log("Facturation", pl(n, "facture générée", "factures générées") + " pour " + label, S.cur.client);
@@ -1587,10 +1592,10 @@ function genMonth(){
 function invDrawer(i){
   const c = clientById(i.client), st = invState(i), tot = invTotal(i);
   let h = `<div class="dr-head"><div style="min-width:0"><div class="eyebrow">Facture · ${esc(c.nom)}</div><h2>${esc(i.id)}</h2></div><div class="dr-tools"><button class="icon-btn" type="button" data-act="close" aria-label="Fermer">×</button></div></div><div class="dr-body">`;
-  h += `<div class="sheet"><div class="inv-head"><div><b style="font-family:var(--f-head);font-size:16px">Bomba Archives</b><div class="small muted">Numérisation et archivage · Limete, Kinshasa</div></div><div style="text-align:right"><h3>FACTURE</h3><div class="mono" style="color:var(--stamp)">${esc(i.id)}</div></div></div>`;
+  h += `<div class="sheet"><div class="inv-head"><div><b style="font-family:var(--f-head);font-size:16px">${esc(ent().nom)}</b><div class="small muted">Numérisation et archivage · ${esc(ent().adresse)}${ent().rccm ? " · RCCM " + esc(ent().rccm) : ""}${ent().idnat ? " · Id. Nat. " + esc(ent().idnat) : ""}${ent().nif ? " · NIF " + esc(ent().nif) : ""}</div></div><div style="text-align:right"><h3>FACTURE</h3><div class="mono" style="color:var(--stamp)">${esc(i.id)}</div></div></div>`;
   h += `<div class="inv-head"><div class="small"><span class="muted">Facturé à</span><br><b>${esc(c.nom)}</b><br>${esc(c.contact)} · ${esc(c.commune)}</div><div class="small" style="text-align:right"><span class="muted">Émise le</span> ${fmtDate(i.date)}<br><span class="muted">Échéance</span> ${fmtDate(i.ech)}<br>${invChip(st)}</div></div>`;
   h += `<div class="scroll-x"><table><thead><tr><th>Désignation</th><th class="r">Qté</th><th class="r">Prix unitaire</th><th class="r">Montant</th></tr></thead><tbody>${i.lignes.map(l => `<tr><td>${esc(l[0])}</td><td class="r">${nf(l[1])}</td><td class="r">${usd(l[2])}</td><td class="r">${usd(l[1]*l[2])}</td></tr>`).join("")}<tr><td colspan="3" class="r"><b>Total à payer</b></td><td class="r"><b>${usd(tot)}</b></td></tr></tbody></table></div>`;
-  h += `<div class="sheet-foot" style="margin-top:12px">Paiement accepté par M-Pesa, Orange Money, Airtel Money ou virement bancaire. Indiquez le numéro de facture dans le motif.</div></div>`;
+  h += `<div class="sheet-foot" style="margin-top:12px">${ent().taux ? `Soit environ ${nf(Math.round(tot * +ent().taux))} FC au taux de ${nf(+ent().taux)} FC pour 1 $. ` : ""}${payLines()}</div></div>`;
   if (i.paye) h += `<div class="box"><h3>Paiement reçu</h3><div class="small">${usd(tot)} reçus le ${fmtDate(i.paye.date)} par ${esc(i.paye.mode)}.</div></div>`;
   else {
     h += `<div class="box"><h3>Enregistrer le paiement</h3><div class="inline"><label class="small" for="pay-mode">Moyen</label><select id="pay-mode">${PAY.map(p => opt(p)).join("")}</select><label class="small" for="pay-date">Date</label><input id="pay-date" type="date" value="${isoDay(TODAY)}"><button class="btn sm primary" type="button" data-act="pay" data-id="${i.id}">Marquer comme payée</button></div></div>`;
@@ -1649,6 +1654,7 @@ function vParametres(){
   h += S.ref.map((r, i) => `<tr><td>${esc(r.type)}</td><td><select aria-label="Durée pour ${esc(r.type)}" data-ref="${i}" data-f="dua">${DUA.map(x => opt(x[0], x[1], x[0] === r.dua)).join("")}</select></td><td><select aria-label="Sort final pour ${esc(r.type)}" data-ref="${i}" data-f="sort">${["Élimination","Conservation définitive"].map(s => opt(s, s, s === r.sort)).join("")}</select></td></tr>`).join("");
   h += '</tbody></table></div>';
   h += `<form id="ref-form" class="inline mt"><label class="small" for="rf-type">Nouveau type</label><input id="rf-type" type="text" placeholder="Ex. Bon de commande"><select id="rf-dua" aria-label="Durée">${DUA.map(x => opt(x[0], x[1], x[0] === 10)).join("")}</select><select id="rf-sort" aria-label="Sort final">${opt("Élimination")}${opt("Conservation définitive")}</select><button class="btn sm primary" type="submit">Ajouter au référentiel</button></form></section>`;
+  h += paramsExtra();
   return h;
 }
 
@@ -1822,8 +1828,9 @@ function vSecurite(){
   const c = client(), u = me(), sc = secu(c), adm = isAdmin(u);
   const team = S.users.filter(x => x.client === c.id), mfaAll = team.every(x => x.mfa);
   const checks = [
-    ["Double authentification sur tous les comptes", mfaAll, 25],
-    ["Filigrane nominatif sur les pages consultées", sc.watermark, 15],
+    ["Double authentification sur tous les comptes", mfaAll, 20],
+    ["Filigrane nominatif sur les pages consultées", sc.watermark, 10],
+    ["Mots de passe de 10 caractères minimum", pwdPol(c).min >= 10, 10],
     ["Déconnexion automatique après 30 minutes au plus", sc.session <= 30, 15],
     ["Accès limité aux réseaux de l'organisation", sc.ip, 15],
     ["Copie hors site de moins de 24 heures", hoursSince(sc.backups.horsSite) < 24, 15],
@@ -1959,7 +1966,7 @@ const tagById = id => S.tags.find(t => t.id === id);
 const tagName = id => (tagById(id) || {nom:""}).nom;
 const clientTags = cid => S.tags.filter(t => t.client === cid);
 const tagChip = (id, rm) => { const t = tagById(id); return t ? `<span class="tg"><i style="background:var(--c${t.c})"></i>${esc(t.nom)}${rm ? `<button type="button" data-act="tag-rm" data-id="${id}" aria-label="Retirer l'étiquette ${esc(t.nom)}">×</button>` : ""}</span>` : ""; };
-const tplFor = type => { const k = Object.keys(S.templates).find(x => norm(x) === norm(type)); return k ? S.templates[k] : []; };
+const tplFor = type => { const all = tplAll(), k = Object.keys(all).find(x => norm(x) === norm(type)); return k ? all[k] : []; };
 const fmtMeta = (f, v) => f[2] === "date" ? fmtDate(v) : f[2] === "money" ? usd(v) : f[2] === "number" ? nf(v) : v;
 const statusLabel = d => ({actif:"Publié", en_validation:"En validation", rejete:"Refusé", a_eliminer:"Proposé à l'élimination", corbeille:"Corbeille", elimine:"Éliminé"})[d.statut] || d.statut;
 const circuitById = id => S.circuits.find(c => c.id === id);
@@ -2379,6 +2386,182 @@ function renderTour(){
   if (el) { el.classList.add("tour-hl"); const r = el.getBoundingClientRect(); if (r.top < 0 || r.top > window.innerHeight - 160) el.scrollIntoView({block:"center"}); }
 }
 
+/* ================= Administration avancée ================= */
+const ident = c => c.ident || (c.ident = {adresse:"", tel:c.tel && c.tel !== "—" ? c.tel : "", email:"", rccm:"", idnat:""});
+const pwdPol = c => c.pwd || (c.pwd = {min:10, exp:90, lock:5, domaines:""});
+const ustat = u => u.statut || "Actif";
+const ustatChip = s => `<span class="chip ${s === "Actif" ? "ok" : s === "Invité" ? "soon" : "over"}">${s === "Invité" ? "Invitation envoyée" : esc(s)}</span>`;
+const ent = () => S.ent || (S.ent = {nom:"Bomba Archives SARL", adresse:"Limete, Kinshasa", rccm:"", idnat:"", nif:"", tel:"", email:"", mpesa:"", orange:"", airtel:"", banque:"", taux:""});
+const recouv = () => S.recouv || (S.recouv = {delai:15, r1:7, r2:15, susp:30});
+const staff = () => S.staff || (S.staff = [
+  {id:"st1", nom:"Arsène Mavungu", role:"Opérateur de numérisation", tel:"", actif:true},
+  {id:"st2", nom:"Joëlle Kabamba", role:"Contrôle qualité", tel:"", actif:true},
+  {id:"st3", nom:"Fiston Mukuna", role:"Coursier", tel:"", actif:true},
+  {id:"st4", nom:"Merveille Nkulu", role:"Commercial", tel:"", actif:true}
+]);
+const tplAll = () => { const c = S.clients.find(x => x.id === S.cur.client); return Object.assign({}, S.templates, (c && c.tpl) || {}); };
+const tplEdit = (c, type) => { c.tpl = c.tpl || {}; if (!c.tpl[type]) c.tpl[type] = (tplAll()[type] || []).map(f => f.slice()); return c.tpl[type]; };
+const KINDS = [["text","Texte"],["date","Date"],["number","Nombre"],["money","Montant ($)"]];
+const COLORS = [[1,"Bleu"],[2,"Orange"],[3,"Violet"],[4,"Vert"],[5,"Rose"],[6,"Ocre"]];
+const activeAdmins = cid => S.users.filter(x => x.client === cid && x.role === "Administrateur" && ustat(x) === "Actif");
+const lastSeen = (cid, nom) => { const a = S.audit.find(x => x.client === cid && x.user === nom); return a ? a.t : null; };
+
+/* ---- Organisation (administrateur du client) ---- */
+function vOrganisation(){
+  const c = client(), u = me();
+  if (!isAdmin(u)) return panel("Accès réservé", "", '<p class="muted" style="margin:0">Les réglages de l\'organisation sont réservés à l\'administrateur.</p>');
+  const id = ident(c), pw = pwdPol(c), docs = S.docs.filter(d => d.client === c.id && d.statut !== "elimine");
+  let h = '<div class="grid2">';
+  h += `<form class="panel" id="org-form"><h2>Identité de l'organisation</h2><div class="fgrid">` +
+    `<div class="field span2"><label for="org-nom">Nom</label><input id="org-nom" type="text" value="${esc(c.nom)}"></div>` +
+    `<div class="field"><label for="org-code">Code</label><input id="org-code" type="text" value="${esc(c.code)}" readonly aria-describedby="org-code-help"><span class="help" id="org-code-help">Utilisé dans les cotes, il ne change pas.</span></div>` +
+    `<div class="field"><label for="org-contact">Responsable</label><input id="org-contact" type="text" value="${esc(c.contact)}"></div>` +
+    `<div class="field span2"><label for="org-adresse">Adresse</label><input id="org-adresse" type="text" value="${esc(id.adresse)}" placeholder="Ex. 12, avenue Kimwenza, Lemba"></div>` +
+    `<div class="field"><label for="org-tel">Téléphone</label><input id="org-tel" type="tel" value="${esc(id.tel)}" placeholder="+243 …"></div>` +
+    `<div class="field"><label for="org-email">E-mail</label><input id="org-email" type="email" value="${esc(id.email)}" placeholder="contact@…"></div>` +
+    `<div class="field"><label for="org-rccm">N° RCCM</label><input id="org-rccm" type="text" value="${esc(id.rccm)}"></div>` +
+    `<div class="field"><label for="org-idnat">Identification nationale</label><input id="org-idnat" type="text" value="${esc(id.idnat)}"></div>` +
+    `</div><div class="form-foot"><span class="small muted">Ces informations figurent sur les copies certifiées et les bordereaux.</span><button class="btn primary" type="submit">Enregistrer</button></div></form>`;
+  const sel = (idx, label, help, opts, val) => `<label class="sw" for="${idx}"><span><b>${label}</b><span class="help">${help}</span></span><select id="${idx}">${opts.map(o => opt(o[0], o[1], String(o[0]) === String(val))).join("")}</select></label>`;
+  h += `<section class="panel"><h2>Politique de connexion</h2>` +
+    sel("pw-min", "Longueur minimale du mot de passe", "Plus un mot de passe est long, plus il résiste.", [[8,"8 caractères"],[10,"10 caractères"],[12,"12 caractères"],[14,"14 caractères"]], pw.min) +
+    sel("pw-exp", "Renouvellement obligatoire", "Demande un nouveau mot de passe après cette durée.", [[0,"Jamais"],[90,"Tous les 90 jours"],[180,"Tous les 180 jours"],[365,"Chaque année"]], pw.exp) +
+    sel("pw-lock", "Verrouillage du compte", "Bloque le compte après plusieurs essais ratés.", [[3,"Après 3 essais"],[5,"Après 5 essais"],[10,"Après 10 essais"]], pw.lock) +
+    `<label class="sw" for="pw-dom"><span><b>Domaines e-mail autorisés</b><span class="help">Laissez vide pour accepter toutes les adresses. Ex. etoiles.cd</span></span><input id="pw-dom" type="text" value="${esc(pw.domaines)}" style="width:160px" placeholder="Tous"></label>` +
+    '<div class="small muted mt">Ces règles sont appliquées par la version serveur à chaque connexion.</div></section>';
+  h += '</div>';
+
+  h += `<section class="panel mt"><h2>Plan de classement : services</h2><p class="small muted" style="margin:-4px 0 12px">Renommer un service met à jour tous ses documents, son courrier, ses règles et les droits des utilisateurs. Les cotes déjà attribuées ne changent pas.</p><div class="tbl"><table><thead><tr><th>Service</th><th>Code</th><th class="r">Documents</th><th class="r">Utilisateurs</th><th></th></tr></thead><tbody>` +
+    c.services.map((s, i) => { const nd = docs.filter(d => d.service === s[0]).length, nu = S.users.filter(x => x.client === c.id && userSvcs(x).includes(s[0])).length;
+      return `<tr><td><input data-svc-ren="${i}" type="text" value="${esc(s[0])}" aria-label="Nom du service ${esc(s[0])}" style="width:100%;min-width:140px"></td><td class="mono">${esc(s[1])}</td><td class="r">${nd}</td><td class="r">${nu}</td><td>${nd || S.courriers.some(m => m.client === c.id && m.service === s[0]) ? '<span class="small muted">Contient des documents</span>' : `<button class="btn sm ghost-danger" type="button" data-act="svc-del" data-id="${i}">Supprimer</button>`}</td></tr>`; }).join("") +
+    `</tbody></table></div><form id="svc-form" class="inline mt"><label class="small" for="sv-nom">Nouveau service</label><input id="sv-nom" type="text" placeholder="Ex. Pastorale" style="flex:1 1 180px"><label class="small" for="sv-code">Code</label><input id="sv-code" type="text" maxlength="4" placeholder="Auto" style="width:80px;text-transform:uppercase"><button class="btn sm primary" type="submit">Ajouter le service</button></form></section>`;
+
+  const tags = clientTags(c.id);
+  h += `<section class="panel mt"><h2>Étiquettes</h2><div class="tbl"><table><thead><tr><th>Étiquette</th><th>Couleur</th><th class="r">Documents</th><th></th></tr></thead><tbody>` +
+    (tags.length ? tags.map(t => `<tr><td><input data-tag-ren="${t.id}" type="text" value="${esc(t.nom)}" aria-label="Nom de l'étiquette ${esc(t.nom)}" style="width:100%;min-width:140px"></td><td><span class="inline" style="gap:6px;flex-wrap:nowrap"><span class="tg" style="padding:2px 6px"><i style="background:var(--c${t.c})"></i></span><select data-tag-col="${t.id}" aria-label="Couleur de ${esc(t.nom)}">${COLORS.map(x => opt(x[0], x[1], x[0] === t.c)).join("")}</select></span></td><td class="r">${S.docs.filter(d => (d.tagIds || []).includes(t.id)).length}</td><td><button class="btn sm ghost-danger" type="button" data-act="tag-del" data-id="${t.id}">Supprimer</button></td></tr>`).join("") : '<tr><td colspan="4" class="empty">Aucune étiquette.</td></tr>') +
+    `</tbody></table></div><form id="tagn-form" class="inline mt"><label class="small" for="tn-nom">Nouvelle étiquette</label><input id="tn-nom" type="text" placeholder="Ex. À archiver en priorité" style="flex:1 1 180px"><select id="tn-col" aria-label="Couleur">${COLORS.map(x => opt(x[0], x[1])).join("")}</select><button class="btn sm primary" type="submit">Créer</button></form></section>`;
+
+  const all = tplAll(), types = Object.keys(all).sort((a, b) => a.localeCompare(b, "fr"));
+  const ty = types.includes(UI.tplType) ? UI.tplType : types[0], fields = all[ty] || [];
+  h += `<section class="panel mt"><h2>Modèles de fiches d'indexation</h2><p class="small muted" style="margin:-4px 0 12px">Les champs de la fiche s'affichent à l'ajout d'un document de ce type, et on peut chercher dedans (par exemple <span class="mono">eleve:Mukendi</span>). Les modifications ne concernent que votre organisation.</p>` +
+    `<div class="toolbar"><div class="inline"><label class="small" for="tpl-type">Type de document</label><select id="tpl-type">${types.map(t => opt(t, t, t === ty)).join("")}</select></div>` +
+    `<form id="tplt-form" class="inline"><label class="small" for="tt-nom">Nouveau type</label><input id="tt-nom" type="text" placeholder="Ex. Bon de commande" style="width:170px"><button class="btn sm" type="submit">Créer le type</button></form></div>` +
+    `<div class="tbl"><table><thead><tr><th>Champ</th><th>Format</th><th>Mot-clé de recherche</th><th></th></tr></thead><tbody>` +
+    (fields.length ? fields.map(f => `<tr><td>${esc(f[1])}</td><td>${esc((KINDS.find(k => k[0] === (f[2] || "text")) || KINDS[0])[1])}</td><td class="mono">${esc(f[0])}:</td><td><button class="btn sm ghost-danger" type="button" data-act="tplf-del" data-k="${esc(f[0])}">Retirer</button></td></tr>`).join("") : '<tr><td colspan="4" class="empty">Aucun champ pour ce type.</td></tr>') +
+    `</tbody></table></div><form id="tplf-form" class="inline mt"><label class="small" for="tf-label">Nouveau champ</label><input id="tf-label" type="text" placeholder="Ex. Numéro de matricule" style="flex:1 1 180px"><select id="tf-kind" aria-label="Format du champ">${KINDS.map(k => opt(k[0], k[1])).join("")}</select><button class="btn sm primary" type="submit">Ajouter le champ</button></form></section>`;
+  return h;
+}
+
+/* ---- Utilisateurs ---- */
+function vUsersPro(){
+  const c = client(), u = me(), adm = isAdmin(u), users = S.users.filter(x => x.client === c.id);
+  let h = '<div class="stats">';
+  h += stat("Comptes actifs", users.filter(x => ustat(x) === "Actif").length, "sur " + pl(users.length, "compte"));
+  h += stat("Invitations en attente", users.filter(x => ustat(x) === "Invité").length, "à accepter par e-mail ou SMS");
+  h += stat("Comptes suspendus", users.filter(x => ustat(x) === "Suspendu").length, "accès bloqué, historique conservé");
+  const allMfa = users.every(x => x.mfa);
+  h += stat("Double authentification", users.filter(x => x.mfa).length + " / " + users.length, allMfa ? "tous les comptes protégés" : "des comptes restent à protéger", !allMfa);
+  h += '</div><div class="roles">';
+  h += '<div class="panel role"><h3><span class="chip acc">Administrateur</span></h3><p>Tous les services et le confidentiel. Gère l\'organisation, les utilisateurs, les circuits et la sécurité, consulte le journal.</p></div>';
+  h += '<div class="panel role"><h3><span class="chip stamp">Gestionnaire</span></h3><p>Ses services, y compris le confidentiel. Ajoute, partage, valide et signe dans les circuits, gère la conservation.</p></div>';
+  h += '<div class="panel role"><h3><span class="chip">Lecteur</span></h3><p>Consulte ses services. Le confidentiel lui est masqué, sauf accès temporaire. Ne peut ni ajouter ni partager.</p></div>';
+  h += '</div><div class="tbl" style="margin-bottom:16px"><table><thead><tr><th>Utilisateur</th><th>Rôle et services</th><th>Statut</th><th>Dernière activité</th><th>Double authentification</th><th>Actions</th></tr></thead><tbody>';
+  h += users.map(x => { const st = ustat(x), ls = lastSeen(c.id, x.nom), self = x.id === u.id;
+    let acts = "";
+    if (adm && !self) {
+      if (st === "Invité") acts += `<button class="btn sm" type="button" data-act="u-resend" data-id="${x.id}">Renvoyer l'invitation</button><button class="btn sm" type="button" data-act="u-activate" data-id="${x.id}">Activer</button>`;
+      else if (st === "Actif") acts += `<button class="btn sm" type="button" data-act="u-reset" data-id="${x.id}">Réinitialiser le mot de passe</button><button class="btn sm" type="button" data-act="u-logout" data-id="${x.id}">Fermer ses sessions</button><button class="btn sm" type="button" data-act="u-suspend" data-id="${x.id}">Suspendre</button>`;
+      else acts += `<button class="btn sm primary" type="button" data-act="u-activate" data-id="${x.id}">Réactiver</button>`;
+      acts += `<button class="btn sm ghost-danger" type="button" data-act="u-del" data-id="${x.id}">Supprimer</button>`;
+    }
+    if (!self) acts += `<button class="btn sm" type="button" data-act="as" data-id="${x.id}">Voir avec ce compte</button>`;
+    return `<tr><td class="nowrap">${esc(x.nom)}${self ? ' <span class="chip ok">vous</span>' : ""}${x.contact ? `<div class="small muted">${esc(x.contact)}</div>` : ""}</td><td><span class="chip ${x.role === "Administrateur" ? "acc" : x.role === "Gestionnaire" ? "stamp" : ""}">${esc(x.role)}</span><div class="small muted">${esc(userSvcs(x).join(", "))}</div></td><td>${ustatChip(st)}</td><td class="nowrap small">${ls ? fmtDT(ls) : '<span class="muted">Jamais</span>'}</td>` +
+      `<td class="nowrap">${x.mfa ? '<span class="chip ok">Code SMS activé</span>' : '<span class="chip soon">Désactivée</span>'}${adm ? ` <button class="linkbtn small" type="button" data-act="mfa" data-id="${x.id}">${x.mfa ? "Désactiver" : "Activer"}</button>` : ""}</td><td><div class="acts">${acts}</div></td></tr>`; }).join("");
+  h += '</tbody></table></div>';
+  h += rightsMatrix(c, u);
+  if (adm) {
+    h += '<form class="panel mt" id="user-form"><h2>Inviter un utilisateur</h2><div class="fgrid">';
+    h += '<div class="field"><label for="nu-nom">Nom complet</label><input id="nu-nom" type="text" placeholder="Ex. Josué Kanza"></div>';
+    h += '<div class="field"><label for="nu-contact">E-mail ou téléphone</label><input id="nu-contact" type="text" placeholder="Ex. +243 81… ou j.kanza@…"></div>';
+    h += `<div class="field"><label for="nu-role">Rôle</label><select id="nu-role">${opt("Gestionnaire")}${opt("Lecteur")}${opt("Administrateur")}</select></div>`;
+    h += '<div class="field" style="justify-content:flex-end"><label class="check" for="nu-inv"><input type="checkbox" id="nu-inv" checked> Envoyer une invitation</label><span class="help">Le compte s\'active quand la personne accepte.</span></div>';
+    h += `<div class="field span2"><span class="small" style="font-weight:500">Services autorisés</span><div class="checks">${svcNames(c).map((s, i) => `<label class="check" for="nu-s${i}"><input type="checkbox" id="nu-s${i}" name="nu-svc" value="${esc(s)}"> ${esc(s)}</label>`).join("")}</div><span class="help">Un administrateur voit automatiquement tous les services.</span></div>`;
+    h += '</div><div class="form-foot"><span class="small muted">La double authentification est activée par défaut pour les nouveaux comptes.</span><button class="btn primary" type="submit">Ajouter</button></div></form>';
+  } else h += '<div class="mt">' + NOTICE("Seul l'administrateur peut inviter, suspendre ou supprimer des comptes et modifier les droits.") + '</div>';
+  return h;
+}
+function addUserPro(){
+  const nom = $("#nu-nom").value.trim(), role = $("#nu-role").value, contact = $("#nu-contact").value.trim(), inv = $("#nu-inv").checked;
+  const svcs = $$('input[name="nu-svc"]:checked').map(i => i.value);
+  if (!nom) return invalid("nu-nom", "Indiquez le nom complet de l'utilisateur.");
+  if (inv && !contact) return invalid("nu-contact", "Indiquez l'e-mail ou le téléphone où envoyer l'invitation.");
+  if (role !== "Administrateur" && !svcs.length) { toast("Cochez au moins un service autorisé."); return; }
+  S.users.push({id:"u" + Date.now(), client:S.cur.client, nom, role, services:role === "Administrateur" ? [] : svcs, mfa:true, contact, statut:inv ? "Invité" : "Actif"});
+  log(inv ? "Invitation envoyée" : "Utilisateur ajouté", nom + " (" + role + ")" + (contact ? " · " + contact : ""));
+  toast(inv ? "Invitation envoyée à " + contact + " (démonstration)" : nom + " a été ajouté comme " + role.toLowerCase());
+  render();
+}
+
+/* ---- Journal ---- */
+function journalList(){
+  const c = client(), per = UI.jPer || "30", now = Date.now(), q = norm(UI.jQ || "");
+  return S.audit.filter(a => a.client === c.id && (per === "all" || now - new Date(a.t) < +per * 864e5) && (UI.jAct === "all" || a.action === UI.jAct) && (UI.jUser === "all" || a.user === UI.jUser) && (!q || norm(a.user + " " + a.action + " " + a.cible).includes(q)));
+}
+function vJournalPro(){
+  const c = client(), u = me();
+  if (!isAdmin(u)) return panel("Accès réservé", "", `<p class="muted" style="margin:0">Le journal d'audit est réservé à l'administrateur de ${esc(c.nom)}. Il garde la trace de chaque consultation, ajout, partage et décision.</p>`);
+  const base = S.audit.filter(a => a.client === c.id), list = journalList();
+  const acts = [...new Set(base.map(a => a.action))].sort(), who = [...new Set(base.map(a => a.user))].sort();
+  let h = '<div class="stats">';
+  h += stat("Entrées", nf(list.length), "selon les filtres");
+  h += stat("Personnes", new Set(list.map(a => a.user)).size, "auteurs des actions");
+  h += stat("Consultations", list.filter(a => a.action === "Consultation").length, "documents ouverts");
+  h += stat("Actions sensibles", list.filter(a => /Partage|Suppr|Élimination|Droits|Sécurité|Libération|Compte|Corbeille/.test(a.action)).length, "partages, suppressions, droits");
+  h += '</div>';
+  h += `<div class="toolbar"><div class="inline"><label class="small muted" for="j-per">Période</label><select id="j-per">${[["7","7 derniers jours"],["30","30 derniers jours"],["90","90 derniers jours"],["all","Tout"]].map(x => opt(x[0], x[1], (UI.jPer || "30") === x[0])).join("")}</select>` +
+    `<label class="small muted" for="j-act">Action</label><select id="j-act">${opt("all","Toutes",UI.jAct==="all")}${acts.map(a => opt(a, a, UI.jAct === a)).join("")}</select>` +
+    `<label class="small muted" for="j-user">Utilisateur</label><select id="j-user">${opt("all","Tous",UI.jUser==="all")}${who.map(a => opt(a, a, UI.jUser === a)).join("")}</select></div>` +
+    `<div class="inline"><form id="j-form" class="inline"><input id="j-q" type="search" value="${esc(UI.jQ || "")}" placeholder="Chercher une cote, un nom…" aria-label="Chercher dans le journal" style="width:200px"><button class="btn sm" type="submit">Filtrer</button></form><button class="btn sm" type="button" data-act="j-csv">Copier pour Excel</button></div></div>`;
+  const shown = list.slice(0, 200);
+  h += '<div class="tbl"><table><thead><tr><th>Date et heure</th><th>Utilisateur</th><th>Action</th><th>Élément concerné</th></tr></thead><tbody>';
+  h += shown.length ? shown.map(a => `<tr><td class="nowrap">${fmtDT(a.t)}</td><td class="nowrap">${esc(a.user)}</td><td><span class="chip">${esc(a.action)}</span></td><td>${esc(a.cible)}</td></tr>`).join("") : '<tr><td colspan="4" class="empty">Aucune entrée pour ces filtres.</td></tr>';
+  h += '</tbody></table></div>';
+  if (list.length > shown.length) h += `<div class="small muted mt">${nf(shown.length)} entrées affichées sur ${nf(list.length)}. Affinez les filtres ou copiez le journal complet pour Excel.</div>`;
+  h += '<div class="mt">' + NOTICE("Dans la version serveur, le journal est conservé à part et ne peut être modifié par personne, pas même un administrateur.") + '</div>';
+  return h;
+}
+
+/* ---- Espace Bomba : suspension, recouvrement, entreprise, équipe ---- */
+const daysLate = i => Math.floor((TODAY - new Date(i.ech)) / 864e5);
+function dunChip(i){
+  if (i.paye) return "";
+  const d = daysLate(i), r = recouv(), n = i.relances || 0;
+  if (d >= r.susp) return '<span class="chip over">Suspension recommandée</span>';
+  if (d >= r.r2 && n < 2) return '<span class="chip soon">2e relance à faire</span>';
+  if (d >= r.r1 && n < 1) return '<span class="chip soon">1re relance à faire</span>';
+  return n ? `<span class="chip">${pl(n, "relance")}</span>` : "";
+}
+const suspReco = c => !c.suspendu && S.invoices.some(i => i.client === c.id && !i.paye && daysLate(i) >= recouv().susp);
+function payLines(){
+  const e = ent(), ln = [["M-Pesa", e.mpesa], ["Orange Money", e.orange], ["Airtel Money", e.airtel], ["Banque", e.banque]].filter(x => x[1]);
+  return ln.length ? "Paiement : " + ln.map(x => x[0] + " " + esc(x[1])).join(" · ") + ". Indiquez le numéro de facture dans le motif." : "Paiement accepté par M-Pesa, Orange Money, Airtel Money ou virement bancaire. Indiquez le numéro de facture dans le motif.";
+}
+function paramsExtra(){
+  const e = ent(), r = recouv(), st = staff();
+  const fld = (k, label, type, ph) => `<div class="field"><label for="en-${k}">${label}</label><input id="en-${k}" data-ent="${k}" type="${type || "text"}" value="${esc(e[k])}"${ph ? ` placeholder="${esc(ph)}"` : ""}></div>`;
+  let h = '<div class="grid2 mt">';
+  h += `<form class="panel" id="ent-form"><h2>Identité de l'entreprise</h2><p class="small muted" style="margin:-4px 0 12px">Ces informations figurent sur les factures.</p><div class="fgrid">${fld("nom","Raison sociale")}${fld("adresse","Adresse")}${fld("rccm","N° RCCM")}${fld("idnat","Identification nationale")}${fld("nif","N° d'impôt (NIF)")}${fld("tel","Téléphone","tel","+243 …")}<div class="field span2"><label for="en-email">E-mail</label><input id="en-email" data-ent="email" type="email" value="${esc(e.email)}"></div></div>` +
+    `<h3 style="font-size:14px;margin:16px 0 8px">Paiement</h3><div class="fgrid">${fld("mpesa","Numéro M-Pesa","tel")}${fld("orange","Numéro Orange Money","tel")}${fld("airtel","Numéro Airtel Money","tel")}${fld("banque","Banque et n° de compte")}<div class="field span2"><label for="en-taux">Taux du jour : francs congolais pour 1 $</label><input id="en-taux" data-ent="taux" type="number" min="0" step="1" value="${esc(e.taux)}" placeholder="À renseigner"><span class="help">Sert seulement à afficher l'équivalent en francs sur les factures. Mettez-le à jour régulièrement.</span></div></div>` +
+    '<div class="form-foot"><span></span><button class="btn primary" type="submit">Enregistrer</button></div></form>';
+  h += `<form class="panel" id="rec-form"><h2>Politique de recouvrement</h2><p class="small muted" style="margin:-4px 0 12px">Rappels appliqués aux factures impayées, comptés à partir de l'échéance. Au-delà du dernier seuil, le client est signalé pour suspension : son espace passe alors en consultation seule.</p><div class="fgrid">` +
+    [["delai","Délai de paiement d'une facture (jours)"],["r1","1re relance après l'échéance (jours)"],["r2","2e relance après l'échéance (jours)"],["susp","Suspension recommandée après l'échéance (jours)"]].map(x => `<div class="field"><label for="rc-${x[0]}">${x[1]}</label><input id="rc-${x[0]}" type="number" min="1" step="1" value="${r[x[0]]}"></div>`).join("") +
+    '</div><div class="form-foot"><span class="small muted">Une politique claire, annoncée dans le contrat, se fait mieux respecter.</span><button class="btn primary" type="submit">Enregistrer</button></div></form>';
+  h += '</div>';
+  h += `<section class="panel mt"><h2>Équipe Bomba</h2><div class="tbl"><table><thead><tr><th>Nom</th><th>Fonction</th><th>Téléphone</th><th>Statut</th><th></th></tr></thead><tbody>${st.map(x => `<tr><td>${esc(x.nom)}</td><td>${esc(x.role)}</td><td class="mono">${esc(x.tel || "—")}</td><td>${x.actif ? '<span class="chip ok">Actif</span>' : '<span class="chip">Désactivé</span>'}</td><td><button class="btn sm" type="button" data-act="staff-toggle" data-id="${x.id}">${x.actif ? "Désactiver" : "Réactiver"}</button></td></tr>`).join("")}</tbody></table></div>` +
+    `<form id="staff-form" class="fgrid three mt"><div class="field"><label for="sf-nom">Nom</label><input id="sf-nom" type="text" placeholder="Nom complet"></div><div class="field"><label for="sf-role">Fonction</label><select id="sf-role">${["Opérateur de numérisation","Contrôle qualité","Coursier","Commercial","Comptable","Gérant"].map(x => opt(x)).join("")}</select></div><div class="field"><label for="sf-tel">Téléphone</label><input id="sf-tel" type="tel" placeholder="+243 …"></div><div class="field span2" style="flex-direction:row;justify-content:flex-end"><button class="btn primary" type="submit">Ajouter à l'équipe</button></div></form></section>`;
+  return h;
+}
+
 /* ================= Notifications ================= */
 function notifs(m){
   const out = [];
@@ -2428,10 +2611,10 @@ function notifs(m){
 
 /* ================= Rendu ================= */
 const VIEWS = {
-  tableau:vTableau, archives:vArchives, ajouter:vAjouter, demandes:vDemandes, conservation:vConservation, utilisateurs:vUsers, journal:vJournal,
+  tableau:vTableau, archives:vArchives, ajouter:vAjouter, demandes:vDemandes, conservation:vConservation, utilisateurs:vUsersPro, journal:vJournalPro,
   pilotage:vPilotage, lots:vLots, magasin:vMagasin, clients:vClients, facturation:vFacturation, devis:vDevis, parametres:vParametres,
   courrier:vCourrier, certificats:vCertificats, rapports:vRapports, securite:vSecurite, prospects:vProspects, missions:vMissions, depenses:vDepenses,
-  taches:vTaches, capture:vCapture, circuits:vCircuits, corbeille:vCorbeille, integrations:vIntegrations
+  taches:vTaches, capture:vCapture, circuits:vCircuits, corbeille:vCorbeille, integrations:vIntegrations, organisation:vOrganisation
 };
 const AFTER = {archives:afterArchives, ajouter:afterAjouter, devis:calcDevis};
 function render(){
@@ -2456,12 +2639,18 @@ function render(){
     w += `<form id="gs-form" class="gsearch" role="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="gs-q" type="search" autocomplete="off" placeholder="Rechercher dans les archives" aria-label="Rechercher dans les archives"><kbd>Ctrl K</kbd></form>`;
     if (canEdit(u)) w += '<a class="btn primary" href="#ajouter" style="height:38px">+ Nouveau document</a>';
     w += `<label for="sel-client">Client<select id="sel-client">${S.clients.map(x => opt(x.id, x.nom, x.id === S.cur.client)).join("")}</select></label>`;
-    w += `<label for="sel-user">Connecté en tant que<select id="sel-user">${S.users.filter(x => x.client === S.cur.client).map(x => opt(x.id, x.nom + " · " + x.role, x.id === u.id)).join("")}</select></label>`;
+    w += `<label for="sel-user">Connecté en tant que<select id="sel-user">${S.users.filter(x => x.client === S.cur.client).map(x => opt(x.id, x.nom + " · " + x.role + (ustat(x) !== "Actif" ? " (" + ustat(x).toLowerCase() + ")" : ""), x.id === u.id)).join("")}</select></label>`;
   } else w += '<span class="as">Connecté : <b style="color:var(--ink)">Gérant · Équipe Bomba</b></span>';
   w += `<button class="bell" type="button" data-act="bell" aria-expanded="${UI.notif}" aria-label="Notifications : ${ns.length}">${ico("bell", "ico")}${ns.length ? `<span class="dot">${ns.length}</span>` : ""}</button>`;
   $("#who").innerHTML = w;
   $("#notif-root").innerHTML = UI.notif ? `<div class="notif"><div class="list">${ns.length ? ns.map(n => `<div class="li"><div><span class="chip ${n.lvl}">${esc(n.tag)}</span> ${esc(n.txt)}</div><button class="btn sm" type="button" data-act="go" data-h="${n.h}">Ouvrir</button></div>`).join("") : empty("Aucune notification.")}</div></div>` : "";
-  try { $("#view").innerHTML = VIEWS[k](); if (AFTER[k]) AFTER[k](); }
+  try {
+    let pre = "";
+    if (m === "client" && c.suspendu) pre = `<div class="notice danger" role="alert"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/></svg><div><b>Compte suspendu</b> depuis le ${fmtDate(c.suspendu.t)} (${esc(c.suspendu.motif)}) : l'espace est en consultation seule. Contactez Bomba Archives pour réactiver l'accès complet.</div></div>`;
+    const us = m === "client" ? ustat(me()) : "Actif";
+    if (us !== "Actif") $("#view").innerHTML = pre + panel(us === "Suspendu" ? "Compte utilisateur suspendu" : "Invitation en attente", "", us === "Suspendu" ? '<p class="muted" style="margin:0">L\'administrateur de votre organisation a suspendu ce compte. Vos documents et votre historique sont conservés. Contactez-le pour retrouver l\'accès.</p>' : `<p class="muted" style="margin:0 0 12px">Une invitation a été envoyée${me().contact ? " à " + esc(me().contact) : ""}. Le compte s'active quand la personne l'accepte et choisit son mot de passe.</p><button class="btn primary" type="button" data-act="u-accept">Accepter l'invitation (démonstration)</button>`);
+    else { $("#view").innerHTML = pre + VIEWS[k](); if (AFTER[k]) AFTER[k](); }
+  }
   catch (err) { console.error(err); $("#view").innerHTML = panel("Cet écran n'a pas pu s'afficher", "", '<p class="muted" style="margin:0 0 12px">Les données enregistrées dans ce navigateur sont peut-être d\'une ancienne version. Réinitialisez la démo pour repartir des données d\'exemple.</p><button class="btn primary" type="button" data-act="reset">Réinitialiser la démo</button>'); }
   const sd = $(".side"); sd.classList.toggle("open", !!UI.menu); $("#menu-btn").setAttribute("aria-expanded", String(!!UI.menu));
   renderDrawer();
@@ -2497,7 +2686,7 @@ document.addEventListener("click", e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const a = b.dataset.act, id = b.dataset.id;
   let d, l, ct, i;
-  const UNDOABLE = {trash:1, "bulk-trash":1, "rule-del":1, "dep-del":1, "ci-del":1, "sv-del":1, "cap-reject":1, "share-revoke":1, "cert-revoke":1, restore:1, "deleg-end":1, unpropose:1, propose:1, gel:1, prolong:1, keep:1, "tag-rm":1, "link-rm":1};
+  const UNDOABLE = {trash:1, "bulk-trash":1, "rule-del":1, "dep-del":1, "ci-del":1, "sv-del":1, "cap-reject":1, "share-revoke":1, "cert-revoke":1, restore:1, "deleg-end":1, unpropose:1, propose:1, gel:1, prolong:1, keep:1, "tag-rm":1, "link-rm":1, "u-suspend":1, "u-del-yes":1, "svc-del":1, "tag-del":1, "tplf-del":1, "client-susp-yes":1, "client-react":1, "staff-toggle":1};
   const before = UNDOABLE[a] ? JSON.stringify(S) : null;
   if (["open","open-tab","inv-open","sv-save","task-sign","help","reset","csv","backup","goto-doc"].includes(a) && !$("#modal-root").innerHTML) lastFocus = b;
   switch (a) {
@@ -2558,12 +2747,28 @@ document.addEventListener("click", e => {
     case "ct-return": ct = ctById(id); ct.statut = "En garde"; if (ct.pos == null) ct.pos = S.pos++; log("Retour au magasin", ct.id + " → " + posLabel(ct.pos), ct.client); toast(ct.id + " rangé en " + posLabel(ct.pos)); render(); break;
     case "ct-restitute": ct = ctById(id); ct.statut = "Restitué"; ct.pos = null; log("Restitution", ct.id + " restitué au client", ct.client); toast(ct.id + " restitué"); render(); break;
     case "mag-more": UI.magAll = true; render(); break;
-    case "open-client": S.cur.client = id; S.cur.user = ""; me(); UI = freshUI(); save(); location.hash = "#tableau"; break;
+    case "open-client": S.cur.client = id; S.cur.user = ""; me(); UI = freshUI(); log("Accès support", "Ouverture de l'espace par l'équipe Bomba", id); location.hash = "#tableau"; break;
     case "client-inv": UI.facClient = id; UI.facStatut = "all"; location.hash = "#facturation"; break;
     case "gen": genMonth(); break;
     case "inv-open": UI.inv = id; renderDrawer(); break;
     case "pay": i = invById(id); i.paye = {date:$("#pay-date").value || isoDay(TODAY), mode:$("#pay-mode").value}; log("Paiement reçu", i.id + " · " + usd(invTotal(i)) + " par " + i.paye.mode, i.client); toast("Paiement enregistré"); render(); break;
-    case "remind": i = invById(id); log("Relance", i.id + " · " + clientById(i.client).nom, i.client); toast("Relance notée au journal"); renderDrawer(); break;
+    case "remind": i = invById(id); i.relances = (i.relances || 0) + 1; log("Relance", i.id + " · " + clientById(i.client).nom, i.client); toast("Relance notée au journal"); renderDrawer(); break;
+    case "u-accept": { const u = me(); u.statut = "Actif"; log("Invitation acceptée", u.nom); toast("Bienvenue, " + u.nom + " : votre compte est actif"); render(); } break;
+    case "u-activate": { const x = userById(id); const was = ustat(x); x.statut = "Actif"; log(was === "Invité" ? "Compte activé" : "Compte réactivé", x.nom); toast(x.nom + " : compte actif"); render(); } break;
+    case "u-resend": { const x = userById(id); log("Invitation renvoyée", x.nom + (x.contact ? " · " + x.contact : "")); toast("Invitation renvoyée" + (x.contact ? " à " + x.contact : "") + " (démonstration)"); } break;
+    case "u-reset": { const x = userById(id); log("Réinitialisation du mot de passe", x.nom); toast("Lien de réinitialisation envoyé à " + (x.contact || x.nom) + " (démonstration)"); } break;
+    case "u-logout": { const x = userById(id); log("Sessions fermées", x.nom); toast("Toutes les sessions de " + x.nom + " sont fermées"); } break;
+    case "u-suspend": { const x = userById(id); if (x.role === "Administrateur" && activeAdmins(x.client).length < 2) { toast("Il faut au moins un administrateur actif : nommez-en un autre d'abord."); return; } x.statut = "Suspendu"; delete x.delegate; log("Compte suspendu", x.nom); toast(x.nom + " : compte suspendu. Son historique est conservé."); render(); } break;
+    case "u-del": { const x = userById(id); $("#modal-root").innerHTML = `<div class="modal-wrap" data-act="modal-bg"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="m-t"><h2 id="m-t">Supprimer le compte de ${esc(x.nom)} ?</h2><p>Son courrier en cours vous sera confié et ses étapes de circuit passeront à l'administrateur. Les documents et le journal d'audit restent intacts. Pour bloquer un accès temporairement, préférez la suspension.</p><div class="inline" style="justify-content:flex-end"><button class="btn" type="button" data-act="modal-no">Annuler</button><button class="btn danger" type="button" data-act="u-del-yes" data-id="${x.id}">Supprimer le compte</button></div></div></div>`; $("#modal-root .btn").focus(); } break;
+    case "u-del-yes": { const x = userById(id), u = me(); if (x.role === "Administrateur" && activeAdmins(x.client).filter(y => y.id !== x.id).length < 1) { $("#modal-root").innerHTML = ""; toast("Il faut au moins un administrateur actif."); return; } S.courriers.forEach(mm => { if (mm.client === x.client && mm.assigne === x.nom && mm.statut !== "Traité") mm.assigne = u.nom; }); S.circuits.forEach(ci => ci.etapes.forEach(e => { if (e.qui === x.id) e.qui = "admin"; })); S.users.forEach(y => { if (y.delegate && y.delegate.to === x.id) delete y.delegate; }); S.users = S.users.filter(y => y.id !== x.id); log("Compte supprimé", x.nom + " (" + x.role + ")"); $("#modal-root").innerHTML = ""; render(); toast("Compte de " + x.nom + " supprimé"); } break;
+    case "svc-del": { const c = client(), sv = c.services[+id]; if (!sv) return; c.services.splice(+id, 1); S.users.forEach(y => { if (y.client === c.id) { y.services = y.services.filter(z => z !== sv[0]); if (y.role !== "Administrateur" && !y.services.length && c.services.length) y.services = [c.services[0][0]]; } }); S.rules = S.rules.filter(r => !(r.client === c.id && r.service === sv[0])); log("Plan de classement", "Service supprimé : " + sv[0]); toast("Service « " + sv[0] + " » supprimé"); render(); } break;
+    case "tag-del": { const t = tagById(id); if (!t) return; S.docs.forEach(x => { if (x.tagIds) x.tagIds = x.tagIds.filter(z => z !== id); }); S.rules.forEach(r => { if (r.tag === id) r.tag = null; }); S.tags = S.tags.filter(z => z.id !== id); if (UI.tag === id) UI.tag = "all"; log("Étiquette supprimée", t.nom); toast("Étiquette « " + t.nom + " » supprimée"); render(); } break;
+    case "tplf-del": { const c = client(), all = tplAll(), types = Object.keys(all).sort((a, b) => a.localeCompare(b, "fr")), ty = types.includes(UI.tplType) ? UI.tplType : types[0]; const f = tplEdit(c, ty), k = f.findIndex(x => x[0] === b.dataset.k); if (k < 0) return; const lb = f[k][1]; f.splice(k, 1); log("Modèle de fiche", ty + " : champ retiré « " + lb + " »"); toast("Champ « " + lb + " » retiré de la fiche " + ty); render(); } break;
+    case "client-susp": { const c = clientById(id); $("#modal-root").innerHTML = `<div class="modal-wrap" data-act="modal-bg"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="m-t"><h2 id="m-t">Suspendre ${esc(c.nom)} ?</h2><p>Son espace passe en consultation seule : ses utilisateurs voient leurs documents mais ne peuvent plus rien ajouter, partager ni signer. Rien n'est supprimé.</p><label class="small" for="cs-motif" style="font-weight:500">Motif</label><select id="cs-motif">${["Impayé","Fin de contrat","Demande du client","Sécurité"].map(x => opt(x)).join("")}</select><div class="inline" style="justify-content:flex-end"><button class="btn" type="button" data-act="modal-no">Annuler</button><button class="btn danger" type="button" data-act="client-susp-yes" data-id="${c.id}">Suspendre le compte</button></div></div></div>`; $("#cs-motif").focus(); } break;
+    case "client-susp-yes": { const c = clientById(id), mo = $("#cs-motif").value; c.suspendu = {motif:mo, t:new Date().toISOString()}; log("Compte client suspendu", c.nom + " · " + mo, c.id); $("#modal-root").innerHTML = ""; render(); toast(c.nom + " : compte suspendu (" + mo.toLowerCase() + ")"); } break;
+    case "client-react": { const c = clientById(id); c.suspendu = null; log("Compte client réactivé", c.nom, c.id); render(); toast(c.nom + " : accès complet rétabli"); } break;
+    case "staff-toggle": { const x = staff().find(y => y.id === id); x.actif = !x.actif; log("Équipe Bomba", x.nom + (x.actif ? " réactivé" : " désactivé"), S.cur.client); render(); toast(x.nom + (x.actif ? " : compte réactivé" : " : compte désactivé")); } break;
+    case "j-csv": { const rows = [["Date","Heure","Utilisateur","Action","Élément"]].concat(journalList().map(a => { const dt = new Date(a.t); return [isoDay(dt), dt.toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"}), a.user, a.action, a.cible]; })); const txt = rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(";")).join("\n"); const fb = () => { $("#modal-root").innerHTML = `<div class="modal-wrap" data-act="modal-bg"><div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="m-t"><h2 id="m-t">Journal au format CSV</h2><p>Sélectionnez le texte, copiez-le, puis collez-le dans Excel.</p><textarea id="csv-txt" rows="8" readonly>${esc(txt)}</textarea><div class="inline" style="justify-content:flex-end"><button class="btn" type="button" data-act="modal-no">Fermer</button></div></div></div>`; const t = $("#csv-txt"); t.focus(); t.select(); }; try { navigator.clipboard.writeText(txt).then(() => toast(pl(rows.length - 1, "entrée copiée", "entrées copiées") + " : collez dans Excel"), fb); } catch (err) { fb(); } } break;
     case "tour": tourGo(0); break;
     case "tour-next": if (UI.tour >= TOUR.length - 1) { tourGo(-1); toast("Visite terminée"); } else tourGo(UI.tour + 1); break;
     case "tour-prev": tourGo(Math.max(0, UI.tour - 1)); break;
@@ -2643,12 +2848,21 @@ document.addEventListener("submit", e => {
   e.preventDefault();
   const id = e.target.id;
   if (id === "up-form") addDoc();
-  else if (id === "user-form") addUser();
+  else if (id === "user-form") addUserPro();
   else if (id === "client-form") addClient();
   else if (id === "ref-form") {
     const type = $("#rf-type").value.trim(); if (!type) { toast("Indiquez le type de document."); return; }
     if (refFor(type)) { toast("Ce type existe déjà dans le référentiel."); return; }
     S.ref.push({type, dua:parseInt($("#rf-dua").value, 10), sort:$("#rf-sort").value}); log("Paramètres", "Référentiel : ajout de « " + type + " »"); toast("Type ajouté au référentiel"); render();
+  } else if (id === "org-form") { const c = client(), nm = $("#org-nom").value.trim(); if (!nm) return invalid("org-nom", "Le nom de l'organisation ne peut pas être vide."); const ct = $("#org-contact").value.trim(); if (!ct) return invalid("org-contact", "Indiquez le responsable."); c.nom = nm; c.contact = ct; Object.assign(ident(c), {adresse:$("#org-adresse").value.trim(), tel:$("#org-tel").value.trim(), email:$("#org-email").value.trim(), rccm:$("#org-rccm").value.trim(), idnat:$("#org-idnat").value.trim()}); log("Organisation", "Identité mise à jour"); render(); toast("Identité de l'organisation enregistrée");
+  } else if (id === "svc-form") { const c = client(), nm = $("#sv-nom").value.trim(); if (!nm) return invalid("sv-nom", "Indiquez le nom du service."); if (c.services.some(x => norm(x[0]) === norm(nm))) return invalid("sv-nom", "Ce service existe déjà."); let code = ($("#sv-code").value.trim() || norm(nm).replace(/[^a-z]/g, "").slice(0, 3)).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4); if (!code) return invalid("sv-code", "Indiquez un code de 2 à 4 lettres."); if (c.services.some(x => x[1] === code)) return invalid("sv-code", "Ce code est déjà utilisé par un autre service."); c.services.push([nm, code]); log("Plan de classement", "Service ajouté : " + nm + " (" + code + ")"); render(); toast("Service « " + nm + " » ajouté");
+  } else if (id === "tagn-form") { const c = client(), nm = $("#tn-nom").value.trim(); if (!nm) return invalid("tn-nom", "Indiquez le nom de l'étiquette."); if (clientTags(c.id).some(t => norm(t.nom) === norm(nm))) return invalid("tn-nom", "Cette étiquette existe déjà."); S.tags.push({id:"t" + S.tagSeq++, client:c.id, nom:nm, c:+$("#tn-col").value}); log("Étiquette créée", nm); render(); toast("Étiquette « " + nm + " » créée");
+  } else if (id === "tplt-form") { const c = client(), nm = $("#tt-nom").value.trim(); if (!nm) return invalid("tt-nom", "Indiquez le nom du type."); if (Object.keys(tplAll()).some(t => norm(t) === norm(nm))) return invalid("tt-nom", "Ce type a déjà un modèle."); c.tpl = c.tpl || {}; c.tpl[nm] = []; UI.tplType = nm; log("Modèle de fiche", "Nouveau type : " + nm); render(); toast("Type « " + nm + " » créé : ajoutez ses champs");
+  } else if (id === "tplf-form") { const c = client(), lb = $("#tf-label").value.trim(); if (!lb) return invalid("tf-label", "Indiquez le nom du champ."); const all = tplAll(), types = Object.keys(all).sort((a, b) => a.localeCompare(b, "fr")), ty = types.includes(UI.tplType) ? UI.tplType : types[0], f = tplEdit(c, ty); let k = norm(lb).replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 28).replace(/_[^_]*$/, m => norm(lb).replace(/[^a-z0-9]+/g, "_").length > 28 ? "" : m) || "champ"; while (f.some(x => x[0] === k)) k += "2"; const kind = $("#tf-kind").value; f.push(kind === "text" ? [k, lb] : [k, lb, kind]); log("Modèle de fiche", ty + " : champ ajouté « " + lb + " »"); render(); toast("Champ « " + lb + " » ajouté : cherchez avec " + k + ":");
+  } else if (id === "j-form") { UI.jQ = $("#j-q").value.trim(); render();
+  } else if (id === "ent-form") { const e = ent(); $$("[data-ent]").forEach(i => { e[i.dataset.ent] = i.value.trim(); }); if (!e.nom) { e.nom = "Bomba Archives SARL"; } log("Paramètres", "Identité de l'entreprise et coordonnées de paiement", S.cur.client); render(); toast("Identité de l'entreprise enregistrée");
+  } else if (id === "rec-form") { const v = k => parseInt($("#rc-" + k).value, 10); const r = {delai:v("delai"), r1:v("r1"), r2:v("r2"), susp:v("susp")}; if (!(r.delai > 0)) return invalid("rc-delai", "Indiquez un nombre de jours supérieur à zéro."); if (!(r.r1 > 0)) return invalid("rc-r1", "Indiquez un nombre de jours supérieur à zéro."); if (!(r.r2 > r.r1)) return invalid("rc-r2", "La 2e relance doit venir après la 1re."); if (!(r.susp > r.r2)) return invalid("rc-susp", "La suspension doit venir après la 2e relance."); S.recouv = r; log("Paramètres", "Politique de recouvrement : " + r.r1 + " / " + r.r2 + " / " + r.susp + " jours", S.cur.client); render(); toast("Politique de recouvrement enregistrée");
+  } else if (id === "staff-form") { const nm = $("#sf-nom").value.trim(); if (!nm) return invalid("sf-nom", "Indiquez le nom de la personne."); staff().push({id:"st" + Date.now(), nom:nm, role:$("#sf-role").value, tel:$("#sf-tel").value.trim(), actif:true}); log("Équipe Bomba", nm + " ajouté", S.cur.client); render(); toast(nm + " ajouté à l'équipe");
   } else if (id === "deleg-form") { const u = me(), to = $("#dg-to").value, until = $("#dg-until").value; if (!until || until < isoDay(TODAY)) { toast("Choisissez une date de fin à partir d'aujourd'hui."); return; } u.delegate = {to, until}; log("Délégation", u.nom + " → " + userById(to).nom + " jusqu'au " + fmtDate(until)); toast("Délégation activée jusqu'au " + fmtDate(until)); render();
   } else if (id === "gs-form") { const v = $("#gs-q").value.trim(); UI = Object.assign(freshUI(), {view:UI.view}); UI.q = v; if (currentKey() === "archives") render(); else location.hash = "#archives";
   } else if (id === "meta-form") { const d = docById(UI.sel); if (!d) return; d.meta = {}; $$("[data-mk]").forEach(i => { if (i.value.trim()) d.meta[i.dataset.mk] = i.value.trim(); }); UI.metaEdit = false; log("Indexation modifiée", lab(d)); render(); toast("Fiche d'indexation enregistrée");
@@ -2732,6 +2946,13 @@ document.addEventListener("change", e => {
   else if (t.dataset.tarif) { S.tarifs[t.dataset.tarif] = Math.max(0, parseFloat(t.value) || 0); log("Paramètres", "Tarif « " + t.dataset.tarif + " » : " + S.tarifs[t.dataset.tarif], S.cur.client); toast("Tarif enregistré"); }
   else if (t.dataset.formule) { S.formules[t.dataset.formule][t.dataset.f] = Math.max(0, parseFloat(t.value) || 0); log("Paramètres", "Formule " + t.dataset.formule + " modifiée", S.cur.client); toast("Formule enregistrée"); }
   else if (t.dataset.ref) { const r = S.ref[+t.dataset.ref]; r[t.dataset.f] = t.dataset.f === "dua" ? parseInt(t.value, 10) : t.value; log("Paramètres", "Référentiel : " + r.type + " → " + duaLabel(r.dua) + ", " + r.sort, S.cur.client); toast("Référentiel mis à jour"); }
+  else if (t.dataset.svcRen != null && t.dataset.svcRen !== "") { const c = client(), i = +t.dataset.svcRen, old = c.services[i][0], nv = t.value.trim(); if (!nv || nv === old) { t.value = old; return; } if (c.services.some((x, j) => j !== i && norm(x[0]) === norm(nv))) { toast("Un autre service porte déjà ce nom."); t.value = old; return; } c.services[i][0] = nv; S.docs.forEach(x => { if (x.client === c.id && x.service === old) x.service = nv; }); S.courriers.forEach(x => { if (x.client === c.id && x.service === old) x.service = nv; }); S.rules.forEach(x => { if (x.client === c.id && x.service === old) x.service = nv; }); S.users.forEach(x => { if (x.client === c.id) x.services = x.services.map(z => z === old ? nv : z); }); if (UI.svc === old) UI.svc = nv; log("Plan de classement", "Service renommé : " + old + " → " + nv); render(); toast("Service renommé en « " + nv + " »"); }
+  else if (t.dataset.tagRen) { const tg = tagById(t.dataset.tagRen), nv = t.value.trim(); if (!nv) { t.value = tg.nom; return; } const old = tg.nom; tg.nom = nv; log("Étiquette renommée", old + " → " + nv); render(); toast("Étiquette renommée"); }
+  else if (t.dataset.tagCol) { const tg = tagById(t.dataset.tagCol); tg.c = +t.value; log("Étiquette", tg.nom + " : couleur changée"); render(); }
+  else if (id === "tpl-type") { UI.tplType = t.value; render(); }
+  else if (id === "pw-min" || id === "pw-exp" || id === "pw-lock") { const p = pwdPol(client()), k = id.slice(3); p[k] = +t.value; log("Sécurité", "Politique de connexion : " + ({min:"longueur minimale", exp:"renouvellement", lock:"verrouillage"})[k] + " = " + t.value); toast("Politique de connexion enregistrée"); render(); }
+  else if (id === "pw-dom") { pwdPol(client()).domaines = t.value.trim(); log("Sécurité", "Domaines e-mail autorisés : " + (t.value.trim() || "tous")); toast("Domaines autorisés enregistrés"); }
+  else if (id === "j-per") { UI.jPer = t.value; render(); }
   else if (id === "note-mention" && t.value) { const ta = $("#note-txt"); ta.value = (ta.value ? ta.value.replace(/\s*$/, " ") : "") + "@" + t.value + " "; t.value = ""; ta.focus(); }
   else if (t.dataset.role) { const x = userById(t.dataset.role), c = client(); if (x.role === "Administrateur" && t.value !== "Administrateur" && S.users.filter(y => y.client === c.id && y.role === "Administrateur").length < 2) { toast("Il faut au moins un administrateur : nommez-en un autre d'abord."); render(); return; } const was = x.role; x.role = t.value; if (x.role !== "Administrateur" && !x.services.length) x.services = [svcNames(c)[0]]; log("Droits modifiés", x.nom + " : " + was + " → " + x.role); toast(x.nom + " est maintenant " + x.role.toLowerCase()); render(); }
   else if (t.dataset.acc) { const x = userById(t.dataset.acc), sv = t.dataset.svc; if (t.checked) { if (!x.services.includes(sv)) x.services.push(sv); } else { if (x.services.length <= 1) { toast("Chaque utilisateur doit garder au moins un service."); render(); return; } x.services = x.services.filter(y => y !== sv); } log("Droits modifiés", x.nom + (t.checked ? " : accès ajouté au service " : " : accès retiré au service ") + sv); toast("Accès mis à jour"); render(); }
