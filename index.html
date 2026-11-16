@@ -445,6 +445,32 @@ table.dt tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-
   .cap{grid-template-columns:minmax(0,1fr)}
   .nav-h{display:none}
 }
+.menu-btn{display:none}
+.side-panel{display:contents}
+[aria-invalid="true"]{border-color:var(--danger)!important;box-shadow:0 0 0 3px var(--danger-soft)}
+.err{color:var(--danger);font-size:12px;font-weight:500}
+.toast{display:flex;gap:14px;align-items:center}
+.toast[hidden],[hidden]{display:none!important}
+.toast-undo{background:none;border:0;color:var(--bg);font-weight:600;text-decoration:underline;text-underline-offset:2px;cursor:pointer;padding:0;font-size:inherit}
+@media (max-width:900px){
+  .brand{width:100%}
+  .gsearch kbd{display:none}
+  .menu-btn{display:inline-flex;align-items:center;gap:8px;margin-left:auto;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 12px;font-weight:600;cursor:pointer}
+  .menu-btn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+  .side-panel{display:none}
+  .side.open .side-panel{display:flex;flex-direction:column;gap:12px}
+  .side.open .nav{flex-direction:column;overflow:visible;padding-bottom:0}
+  .side.open .nav a{white-space:normal}
+  .side.open .nav-h{display:block}
+  .side.open .side-foot{flex-direction:column;align-items:stretch}
+}
+@media print{
+  .side,.who,#notif-root,.toast,#tour-root,.bulk,.hint,.lot-actions,.dr-tools,.dr-actions,.dr-tabs,.scrim,.searchbar,.toolbar .seg{display:none!important}
+  .app{display:block}
+  main{padding:0}
+  .drawer{position:static;width:auto;box-shadow:none;border:0;padding:0}
+  .panel,.stat,.tbl,.lot{break-inside:avoid}
+}
 </style>
 </head>
 <body>
@@ -453,14 +479,18 @@ table.dt tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-
     <div class="brand">
       <div class="mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 8h18v12H3z"/><path d="M2 4h20v4H2z"/><path d="M10 12h4"/></svg></div>
       <div><b>Bomba Archives</b><small>« Kobomba » : garder, en lingala</small></div>
+      <button class="menu-btn" id="menu-btn" type="button" data-act="menu" aria-expanded="false" aria-controls="side-panel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Menu</button>
     </div>
+    <div class="side-panel" id="side-panel">
     <div class="modes" id="modes"></div>
     <nav class="nav" id="nav" aria-label="Navigation principale"></nav>
     <div class="side-foot">
       <p>Démonstration avec des données d'exemple. Vos modifications restent dans ce navigateur.</p>
       <button class="btn sm primary" type="button" data-act="tour">Lancer la visite guidée</button>
       <button class="linkbtn" type="button" data-act="help">Raccourcis clavier</button>
+      <button class="linkbtn" type="button" data-act="backup">Sauvegarder ou restaurer la démo</button>
       <button class="linkbtn" type="button" data-act="reset">Réinitialiser la démo</button>
+    </div>
     </div>
   </aside>
   <main>
@@ -485,6 +515,7 @@ table.dt tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-
 (() => {
 "use strict";
 const KEY = "bomba-archives-demo-v5";
+const PREFS = (() => { try { return JSON.parse(localStorage.getItem("bomba-prefs")) || {}; } catch (e) { return {}; } })();
 const STAGES = ["Collecte","Préparation","Numérisation","Indexation","Contrôle qualité","Mis en ligne","Restitué"];
 const DUA = [[5,"5 ans"],[10,"10 ans"],[20,"20 ans"],[25,"25 ans"],[30,"30 ans"],[50,"50 ans"],[99,"Permanente"]];
 const PAY = ["M-Pesa","Orange Money","Airtel Money","Virement bancaire","Espèces"];
@@ -879,6 +910,7 @@ function syncCartons(l, st){
   });
 }
 function load(){
+  try { ["bomba-archives-demo-v1","bomba-archives-demo-v2","bomba-archives-demo-v3","bomba-archives-demo-v4"].forEach(k => localStorage.removeItem(k)); } catch (e) {}
   try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); if (s && s.v === 5 && s.docs) return s; } } catch (e) {}
   return seed();
 }
@@ -887,7 +919,7 @@ let FILES = {};
 let pendingFile = null;
 let UI = freshUI();
 function freshUI(){ return {q:"", svc:"all", type:"all", year:"all", sort:"recent", fav:false, sel:null, page:1, zoom:100, share:null, req:null, inv:null, notif:false,
-  lotClient:"all", jAct:"all", jUser:"all", magClient:"all", magStatut:"all", magAll:false, facStatut:"all", facClient:"all", demStatut:"En attente", tab:"apercu", courSens:"Tous", courStatut:"all", vcode:"", vres:"", misStatut:"all", depMois:monthKey(TODAY), view:"liste", selIds:[], tag:"all", capSel:null, metaEdit:false, helpQ:false}; }
+  lotClient:"all", jAct:"all", jUser:"all", magClient:"all", magStatut:"all", magAll:false, facStatut:"all", facClient:"all", demStatut:"En attente", tab:"apercu", courSens:"Tous", courStatut:"all", vcode:"", vres:"", misStatut:"all", depMois:monthKey(TODAY), view:PREFS.view === "tableau" ? "tableau" : "liste", limit:25, selIds:[], tag:"all", capSel:null, metaEdit:false, helpQ:false}; }
 function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
 
 /* ================= Règles ================= */
@@ -1067,18 +1099,20 @@ function updateResults(){
   list.sort((a, b) => UI.sort === "titre" ? a.titre.localeCompare(b.titre, "fr") : UI.sort === "ancien" ? a.date.localeCompare(b.date) : UI.sort === "cote" ? a.cote.localeCompare(b.cote) : b.date.localeCompare(a.date));
   $("#count").textContent = pl(list.length, "document") + (UI.q.trim() ? " pour « " + UI.q.trim() + " »" : "");
   UI.selIds = UI.selIds.filter(id => list.some(d => d.id === id));
+  const lim = UI.limit || 25, shown = list.slice(0, lim);
   const chips = d => `${d.conf ? `<span class="chip conf">${LOCK} ${canRead(d, u) ? "Confidentiel" : "Accès sur demande"}</span>` : ""}${d.statut === "a_eliminer" ? '<span class="chip soon">Proposé à l\'élimination</span>' : ""}${d.statut === "en_validation" ? '<span class="chip soon">En validation</span>' : d.statut === "rejete" ? '<span class="chip over">Refusé</span>' : ""}${(d.signatures || []).length ? '<span class="chip ok">Signé</span>' : ""}${d.lock ? `<span class="chip stamp">Extrait par ${esc(d.lock.by)}</span>` : ""}`;
   if (UI.view === "tableau") {
-    const all = list.length > 0 && UI.selIds.length === list.length;
+    const all = shown.length > 0 && shown.every(d => UI.selIds.includes(d.id));
     $("#results").innerHTML = `<div class="tbl"><table class="dt"><thead><tr>${ed ? `<th style="width:36px"><input type="checkbox" id="sel-all" aria-label="Tout sélectionner"${all ? " checked" : ""}></th>` : ""}<th>Cote</th><th>Titre</th><th>Type</th><th>Service</th><th>Date</th><th class="r">Pages</th><th>Étiquettes</th></tr></thead><tbody>` +
-      (list.length ? list.map(d => { const sl = UI.selIds.includes(d.id); return `<tr data-act="open" data-id="${d.id}" tabindex="0"${sl ? ' class="sel"' : ""}>${ed ? `<td data-act="noop"><input type="checkbox" data-sel="${d.id}" aria-label="Sélectionner ${esc(d.titre)}"${sl ? " checked" : ""}></td>` : ""}<td class="nowrap"><span class="mono">${hl(d.cote, ts)}</span></td><td>${favs.includes(d.id) ? '<span style="color:var(--stamp)">★</span> ' : ""}${hl(d.titre, ts)} <span class="inline" style="gap:4px;display:inline-flex">${chips(d)}</span></td><td>${esc(d.type)}</td><td>${esc(d.service)}</td><td class="nowrap">${fmtDate(d.date)}</td><td class="r">${d.pages}</td><td><span class="inline" style="gap:4px">${(d.tagIds || []).map(id => tagChip(id)).join("")}</span></td></tr>`; }).join("") : `<tr><td colspan="${ed ? 8 : 7}" class="empty">Aucun document ne correspond. Vérifiez l'orthographe ou retirez un filtre.</td></tr>`) + '</tbody></table></div>';
+      (list.length ? shown.map(d => { const sl = UI.selIds.includes(d.id); return `<tr data-act="open" data-id="${d.id}" tabindex="0"${sl ? ' class="sel"' : ""}>${ed ? `<td data-act="noop"><input type="checkbox" data-sel="${d.id}" aria-label="Sélectionner ${esc(d.titre)}"${sl ? " checked" : ""}></td>` : ""}<td class="nowrap"><span class="mono">${hl(d.cote, ts)}</span></td><td>${favs.includes(d.id) ? '<span style="color:var(--stamp)">★</span> ' : ""}${hl(d.titre, ts)} <span class="inline" style="gap:4px;display:inline-flex">${chips(d)}</span></td><td>${esc(d.type)}</td><td>${esc(d.service)}</td><td class="nowrap">${fmtDate(d.date)}</td><td class="r">${d.pages}</td><td><span class="inline" style="gap:4px">${(d.tagIds || []).map(id => tagChip(id)).join("")}</span></td></tr>`; }).join("") : `<tr><td colspan="${ed ? 8 : 7}" class="empty">Aucun document ne correspond. Vérifiez l'orthographe ou retirez un filtre.</td></tr>`) + '</tbody></table></div>';
   } else {
-    $("#results").innerHTML = '<div class="results">' + (list.length ? list.map(d => {
+    $("#results").innerHTML = '<div class="results">' + (list.length ? shown.map(d => {
       const rd = canRead(d, u), sn = ts.length && rd ? snippet(d.texte, ts) : "";
       return `<button class="row" type="button" data-act="open" data-id="${d.id}"><span class="t">${favs.includes(d.id) ? '<span style="color:var(--stamp)">★</span> ' : ""}${hl(d.titre, ts)}</span><span class="rs">${chips(d)}<span class="chip">${esc(d.type)}</span></span>` +
         `<span class="m"><span class="mono">${hl(d.cote, ts)}</span><span>${esc(d.service)}</span><span>${fmtDate(d.date)}</span><span>${d.pages} p.</span>${(d.versions || []).length > 1 ? `<span>v${d.versions.length}</span>` : ""}${(d.tagIds || []).map(id => tagChip(id)).join("")}</span>` + (sn ? `<span class="snip">${sn}</span>` : "") + '</button>';
     }).join("") : empty("Aucun document ne correspond. Vérifiez l'orthographe ou retirez un filtre.")) + '</div>';
   }
+  if (list.length > shown.length) $("#results").insertAdjacentHTML("beforeend", `<div class="mt"><button class="btn" type="button" data-act="more">Afficher ${Math.min(25, list.length - shown.length)} documents de plus · ${shown.length} sur ${list.length}</button></div>`);
   $("#bulk").innerHTML = ed && UI.view === "tableau" && UI.selIds.length ? `<div class="bulk" role="region" aria-label="Actions groupées"><b>${pl(UI.selIds.length, "document sélectionné", "documents sélectionnés")}</b><select id="bulk-tag" aria-label="Ajouter une étiquette aux documents sélectionnés">${opt("", "Ajouter une étiquette…")}${clientTags(c.id).map(tg => opt(tg.id, tg.nom)).join("")}</select><select id="bulk-svc" aria-label="Déplacer les documents sélectionnés">${opt("", "Déplacer vers le service…")}${userSvcs(u).map(x => opt(x)).join("")}</select><button class="btn sm" type="button" data-act="bulk-trash">Mettre à la corbeille</button><button class="btn sm" type="button" data-act="bulk-clear">Désélectionner</button></div>` : "";
 }
 
@@ -1238,8 +1272,10 @@ function afterAjouter(){
 function addDoc(){
   const u = me(), c = client();
   const titre = $("#up-titre").value.trim(), type = $("#up-type").value.trim(), svc = $("#up-service").value, date = $("#up-date").value, texte = $("#up-texte").value.trim();
-  if (!titre || !type || !date) { toast("Renseignez le titre, le type et la date du document."); return; }
-  if (!pendingFile && !texte) { toast("Ajoutez un fichier scanné ou saisissez le texte du document."); return; }
+  if (!titre) return invalid("up-titre", "Indiquez le titre du document.");
+  if (!type) return invalid("up-type", "Indiquez le type, par exemple Contrat.");
+  if (!date) return invalid("up-date", "Indiquez la date du document.");
+  if (!pendingFile && !texte) return invalid("up-texte", "Ajoutez un fichier scanné ou saisissez le texte du document.");
   const valid = !isAdmin(u);
   const cote = nextCote(c, svc, date);
   const d = {id:"d"+(++S.nid), client:c.id, service:svc, type, titre, date, pages:Math.max(1, parseInt($("#up-pages").value, 10) || 1), conf:$("#up-conf").checked, dua:parseInt($("#up-dua").value, 10),
@@ -1345,7 +1381,7 @@ function vUsers(){
 function addUser(){
   const nom = $("#nu-nom").value.trim(), role = $("#nu-role").value;
   const svcs = $$('input[name="nu-svc"]:checked').map(i => i.value);
-  if (!nom) { toast("Indiquez le nom de l'utilisateur."); return; }
+  if (!nom) return invalid("nu-nom", "Indiquez le nom complet de l'utilisateur.");
   if (role !== "Administrateur" && !svcs.length) { toast("Cochez au moins un service autorisé."); return; }
   S.users.push({id:"u"+Date.now(), client:S.cur.client, nom, role, services:role === "Administrateur" ? [] : svcs, mfa:true});
   log("Utilisateur ajouté", nom + " (" + role + ")");
@@ -1498,7 +1534,8 @@ function createClient(o){
 }
 function addClient(){
   const nom = $("#nc-nom").value.trim(), contact = $("#nc-contact").value.trim();
-  if (!nom || !contact) { toast("Indiquez le nom de l'organisation et du responsable."); return; }
+  if (!nom) return invalid("nc-nom", "Indiquez le nom de l'organisation.");
+  if (!contact) return invalid("nc-contact", "Indiquez le nom du responsable.");
   const c = createClient({nom, secteur:$("#nc-secteur").value, commune:$("#nc-commune").value.trim(), formule:$("#nc-formule").value, contact, tel:$("#nc-tel").value.trim()});
   toast(nom + " a été créé avec le code " + c.code);
   render();
@@ -1687,7 +1724,9 @@ function vCourrier(){
 }
 function addCourrier(){
   const c = client(), sens = $("#cf-sens").value, date = $("#cf-date").value, objet = $("#cf-objet").value.trim(), tiers = $("#cf-tiers").value.trim();
-  if (!date || !objet || !tiers) { toast("Renseignez la date, l'objet et l'expéditeur ou le destinataire."); return; }
+  if (!date) return invalid("cf-date", "Indiquez la date du courrier.");
+  if (!objet) return invalid("cf-objet", "Indiquez l'objet du courrier.");
+  if (!tiers) return invalid("cf-tiers", "Indiquez l'expéditeur ou le destinataire.");
   const pre = (sens === "Arrivée" ? "CA/" : "CD/") + date.slice(0, 4) + "/";
   const max = S.courriers.filter(m => m.client === c.id && m.id.startsWith(pre)).reduce((a, m) => Math.max(a, parseInt(m.id.slice(pre.length), 10) || 0), 0);
   const m = {id:pre + String(max + 1).padStart(4, "0"), client:c.id, sens, date, tiers, objet, service:$("#cf-service").value, statut:sens === "Départ" ? "Traité" : "À traiter", ech:$("#cf-ech").value || null, assigne:$("#cf-assigne").value, doc:null};
@@ -2422,8 +2461,9 @@ function render(){
   w += `<button class="bell" type="button" data-act="bell" aria-expanded="${UI.notif}" aria-label="Notifications : ${ns.length}">${ico("bell", "ico")}${ns.length ? `<span class="dot">${ns.length}</span>` : ""}</button>`;
   $("#who").innerHTML = w;
   $("#notif-root").innerHTML = UI.notif ? `<div class="notif"><div class="list">${ns.length ? ns.map(n => `<div class="li"><div><span class="chip ${n.lvl}">${esc(n.tag)}</span> ${esc(n.txt)}</div><button class="btn sm" type="button" data-act="go" data-h="${n.h}">Ouvrir</button></div>`).join("") : empty("Aucune notification.")}</div></div>` : "";
-  $("#view").innerHTML = VIEWS[k]();
-  if (AFTER[k]) AFTER[k]();
+  try { $("#view").innerHTML = VIEWS[k](); if (AFTER[k]) AFTER[k](); }
+  catch (err) { console.error(err); $("#view").innerHTML = panel("Cet écran n'a pas pu s'afficher", "", '<p class="muted" style="margin:0 0 12px">Les données enregistrées dans ce navigateur sont peut-être d\'une ancienne version. Réinitialisez la démo pour repartir des données d\'exemple.</p><button class="btn primary" type="button" data-act="reset">Réinitialiser la démo</button>'); }
+  const sd = $(".side"); sd.classList.toggle("open", !!UI.menu); $("#menu-btn").setAttribute("aria-expanded", String(!!UI.menu));
   renderDrawer();
   renderTour();
 }
@@ -2435,7 +2475,21 @@ function renderDrawer(){
   root.innerHTML = `<div class="scrim" data-act="close"></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="${esc(d.titre)}">${docDrawer(d)}</aside>`;
 }
 let toastTimer = null;
-function toast(msg){ const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 3400); }
+let UNDO = null, lastFocus = null;
+function toast(msg, undo){ const t = $("#toast"); UNDO = undo || null; t.innerHTML = `<span>${esc(msg)}</span>${undo ? '<button type="button" class="toast-undo" data-act="undo">Annuler</button>' : ""}`; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; UNDO = null; }, undo ? 7000 : 3400); }
+function offerUndo(before){ const t = $("#toast"), sp = t.querySelector("span"); toast(!t.hidden && sp ? sp.textContent : "Modification enregistrée", before); }
+function restoreFocus(){ const f = lastFocus; lastFocus = null; setTimeout(() => { if (f && document.body.contains(f)) f.focus(); }, 0); }
+function invalid(id, msg){
+  const el = $("#" + id); if (!el) { toast(msg); return; }
+  const fid = id + "-err"; let er = $("#" + fid);
+  if (!er) { er = document.createElement("span"); er.className = "err"; er.id = fid; er.setAttribute("role", "alert"); el.insertAdjacentElement("afterend", er); }
+  er.textContent = msg; el.setAttribute("aria-invalid", "true"); el.setAttribute("aria-describedby", fid); el.focus();
+}
+function openBackup(){
+  const kb = Math.max(1, Math.round(JSON.stringify(S).length / 1024));
+  $("#modal-root").innerHTML = `<div class="modal-wrap" data-act="modal-bg"><div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="m-t"><h2 id="m-t">Sauvegarder ou restaurer la démo</h2><p>Les données de la démo restent dans ce navigateur. Copiez la sauvegarde pour la garder ou l'ouvrir sur un autre appareil, puis collez-la ici pour la restaurer.</p><div class="inline"><button class="btn primary" type="button" data-act="bk-copy">Copier la sauvegarde</button><span class="small muted">${nf(kb)} Ko · ${pl(S.docs.length, "document")} · ${pl(S.clients.length, "client")}</span></div><label class="small" for="bk-in" style="font-weight:500">Restaurer une sauvegarde</label><textarea id="bk-in" rows="5" placeholder="Collez ici le texte d'une sauvegarde Bomba Archives"></textarea><div class="inline" style="justify-content:flex-end"><button class="btn" type="button" data-act="modal-no">Fermer</button><button class="btn" type="button" data-act="bk-restore">Restaurer</button></div></div></div>`;
+  $("#modal-root .btn").focus();
+}
 const randomLink = () => { const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s = ""; for (let i = 0; i < 8; i++) s += a[Math.floor(Math.random() * a.length)]; return "https://archives.bomba.cd/p/" + s; };
 const openDoc = id => { const d = docById(id); if (!d) return; UI.sel = id; UI.page = 1; UI.share = null; UI.req = null; UI.tab = "apercu"; UI.metaEdit = false; if (canRead(d, me())) log("Consultation", lab(d)); };
 
@@ -2443,10 +2497,13 @@ document.addEventListener("click", e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const a = b.dataset.act, id = b.dataset.id;
   let d, l, ct, i;
+  const UNDOABLE = {trash:1, "bulk-trash":1, "rule-del":1, "dep-del":1, "ci-del":1, "sv-del":1, "cap-reject":1, "share-revoke":1, "cert-revoke":1, restore:1, "deleg-end":1, unpropose:1, propose:1, gel:1, prolong:1, keep:1, "tag-rm":1, "link-rm":1};
+  const before = UNDOABLE[a] ? JSON.stringify(S) : null;
+  if (["open","open-tab","inv-open","sv-save","task-sign","help","reset","csv","backup","goto-doc"].includes(a) && !$("#modal-root").innerHTML) lastFocus = b;
   switch (a) {
     case "open": openDoc(id); renderDrawer(); { const x = $(".drawer [data-act=close]"); if (x) x.focus(); } break;
     case "goto-doc": UI = Object.assign(freshUI(), {notif:UI.notif}); openDoc(id); if (currentKey() === "archives") render(); else location.hash = "#archives"; break;
-    case "close": UI.sel = null; UI.inv = null; UI.share = null; UI.req = null; renderDrawer(); break;
+    case "close": UI.sel = null; UI.inv = null; UI.share = null; UI.req = null; renderDrawer(); restoreFocus(); break;
     case "bell": UI.notif = !UI.notif; render(); break;
     case "go": UI.notif = false; UI.sel = null; if (currentKey() === b.dataset.h) render(); else location.hash = "#" + b.dataset.h; break;
     case "try": UI.q = b.dataset.q; $("#q").value = UI.q; updateResults(); break;
@@ -2521,7 +2578,7 @@ document.addEventListener("click", e => {
     case "noop": break;
     case "modal-bg": if (e.target === b) $("#modal-root").innerHTML = ""; break;
     case "open-tab": openDoc(id); UI.tab = b.dataset.t; if (UI.tab === "notes") markDocMentions(id); render(); break;
-    case "view-mode": UI.view = b.dataset.v; render(); break;
+    case "view-mode": UI.view = b.dataset.v; try { localStorage.setItem("bomba-prefs", JSON.stringify({view:UI.view})); } catch (err) {} render(); break;
     case "tagf": UI.tag = UI.tag === id ? "all" : id; updateResults(); break;
     case "q-help": UI.helpQ = !UI.helpQ; $("#qhelp").hidden = !UI.helpQ; b.setAttribute("aria-expanded", String(UI.helpQ)); break;
     case "sv-open": { const v = S.views.find(x => x.id === id); if (!v) return; Object.assign(UI, {q:v.q, svc:v.svc, type:v.type, year:v.year, tag:v.tag}); render(); toast("Vue « " + v.nom + " » appliquée"); } break;
@@ -2537,7 +2594,7 @@ document.addEventListener("click", e => {
     case "force-unlock": d = docById(UI.sel); { const who = d.lock ? d.lock.by : ""; d.lock = null; log("Libération forcée", lab(d) + " · extrait par " + who); toast("Document libéré"); } render(); break;
     case "trash": d = docById(UI.sel); if (!d) return; if (d.gel) { toast("Document sous gel juridique : il ne peut pas être supprimé."); return; } d.prev = d.statut; d.statut = "corbeille"; d.delAt = new Date().toISOString(); d.delBy = me().nom; d.lock = null; log("Corbeille", lab(d)); UI.sel = null; render(); toast("Document mis à la corbeille. Vous pouvez le restaurer depuis la Corbeille."); break;
     case "restore": d = docById(id); d.statut = d.prev && d.prev !== "corbeille" ? d.prev : "actif"; log("Restauration", lab(d)); render(); toast("Document restauré"); break;
-    case "purge": { d = docById(id); const r = retention(d); if (d.gel) { toast("Document sous gel juridique : suppression impossible."); return; } if (r.state !== "over" || sortFor(d) !== "Élimination") { toast(r.exp ? "Suppression impossible : la durée de conservation court jusqu'au " + fmtDate(r.exp) + ". Restaurez le document ou attendez l'échéance." : "Suppression impossible : ce document est à conservation permanente."); return; } d.statut = "elimine"; d.elimPV = "Suppression définitive depuis la corbeille"; d.elimAt = new Date().toISOString(); log("Élimination", lab(d) + " · depuis la corbeille"); render(); toast("Document supprimé définitivement et inscrit au registre des éliminations"); } break;
+    case "purge": { d = docById(id); const r = retention(d); if (d.gel) { toast("Document sous gel juridique : suppression impossible."); return; } if (r.state !== "over" || sortFor(d) !== "Élimination") { toast(r.exp ? "Suppression impossible : la durée de conservation court jusqu'au " + fmtDate(r.exp) + ". Restaurez le document ou attendez l'échéance." : "Suppression impossible : ce document est à conservation permanente."); return; } $("#modal-root").innerHTML = `<div class="modal-wrap" data-act="modal-bg"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="m-t"><h2 id="m-t">Supprimer définitivement ?</h2><p>« ${esc(d.titre)} » sera retiré pour toujours et inscrit au registre des éliminations. Cette action ne peut pas être annulée.</p><div class="inline" style="justify-content:flex-end"><button class="btn" type="button" data-act="modal-no">Annuler</button><button class="btn danger" type="button" data-act="purge-yes" data-id="${d.id}">Supprimer définitivement</button></div></div></div>`; $("#modal-root .btn").focus(); } break;
     case "meta-edit": UI.metaEdit = true; renderDrawer(); break;
     case "meta-cancel": UI.metaEdit = false; renderDrawer(); break;
     case "tag-add": { d = docById(UI.sel); const v = $("#tag-add-sel").value; if (!v) { toast("Choisissez une étiquette."); return; } d.tagIds = (d.tagIds || []).concat(v); log("Étiquette ajoutée", lab(d) + " · " + tagName(v)); render(); } break;
@@ -2570,9 +2627,17 @@ document.addEventListener("click", e => {
     case "reset":
       $("#modal-root").innerHTML = '<div class="modal-wrap"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="m-t"><h2 id="m-t">Réinitialiser la démo ?</h2><p>Vos ajouts et modifications seront effacés, et les données d\'exemple seront rétablies.</p><div class="inline" style="justify-content:flex-end"><button class="btn" type="button" data-act="modal-no">Annuler</button><button class="btn danger" type="button" data-act="reset-yes">Réinitialiser</button></div></div></div>';
       $("#modal-root .btn").focus(); break;
-    case "modal-no": $("#modal-root").innerHTML = ""; break;
+    case "modal-no": $("#modal-root").innerHTML = ""; restoreFocus(); break;
+    case "undo": if (!UNDO) return; S = JSON.parse(UNDO); UNDO = null; save(); UI.selIds = []; render(); toast("Action annulée"); break;
+    case "menu": UI.menu = !UI.menu; render(); break;
+    case "more": UI.limit = (UI.limit || 25) + 25; updateResults(); break;
+    case "backup": openBackup(); break;
+    case "bk-copy": { const txt = JSON.stringify(S), fb = () => { const t = $("#bk-in"); t.value = txt; t.focus(); t.select(); toast("Sauvegarde sélectionnée : copiez-la avec Ctrl+C"); }; try { navigator.clipboard.writeText(txt).then(() => toast("Sauvegarde copiée : collez-la dans un fichier texte pour la garder"), fb); } catch (err) { fb(); } } break;
+    case "bk-restore": { let x = null; try { x = JSON.parse($("#bk-in").value); } catch (err) {} if (!x || x.v !== S.v || !Array.isArray(x.docs) || !Array.isArray(x.clients) || !Array.isArray(x.users)) return invalid("bk-in", "Ce texte n'est pas une sauvegarde valide de cette version de la démo."); S = x; save(); UI = freshUI(); $("#modal-root").innerHTML = ""; render(); toast("Sauvegarde restaurée"); } break;
+    case "purge-yes": { d = docById(id); d.statut = "elimine"; d.elimPV = "Suppression définitive depuis la corbeille"; d.elimAt = new Date().toISOString(); log("Élimination", lab(d) + " · depuis la corbeille"); $("#modal-root").innerHTML = ""; render(); toast("Document supprimé définitivement et inscrit au registre des éliminations"); } break;
     case "reset-yes": try { localStorage.removeItem(KEY); } catch (err) {} S = seed(); FILES = {}; UI = freshUI(); $("#modal-root").innerHTML = ""; render(); toast("Démo réinitialisée"); break;
   }
+  if (before && JSON.stringify(S) !== before) offerUndo(before);
 });
 document.addEventListener("submit", e => {
   e.preventDefault();
@@ -2603,7 +2668,8 @@ document.addEventListener("submit", e => {
   } else if (id === "cert-form") {
     const d = docById(UI.sel), pour = $("#ce-pour").value.trim(), motif = $("#ce-motif").value.trim();
     if (!d) return;
-    if (!pour || !motif) { toast("Indiquez à qui la copie est remise et pourquoi."); return; }
+    if (!pour) return invalid("ce-pour", "Indiquez à qui la copie est remise.");
+    if (!motif) return invalid("ce-motif", "Indiquez le motif de la copie.");
     const x = {code:genCode(), client:d.client, doc:d.id, by:me().nom, t:new Date().toISOString(), pour, motif, exp:isoDay(addDays(TODAY, 30 * parseInt($("#ce-val").value, 10))), revoque:false, verifs:0};
     S.certs.push(x); log("Copie certifiée", x.code + " · " + lab(d)); toast("Copie certifiée délivrée : " + x.code); renderDrawer();
   } else if (id === "ver-form") {
@@ -2617,7 +2683,8 @@ document.addEventListener("submit", e => {
     log("Nouvelle version", lab(d) + " · v" + v.v); toast("Version " + v.v + " enregistrée"); renderDrawer();
   } else if (id === "pros-form") {
     const nom = $("#pf-nom").value.trim(), contact = $("#pf-contact").value.trim();
-    if (!nom || !contact) { toast("Indiquez l'organisation et la personne de contact."); return; }
+    if (!nom) return invalid("pf-nom", "Indiquez le nom de l'organisation.");
+    if (!contact) return invalid("pf-contact", "Indiquez la personne de contact.");
     const pages = Math.max(0, parseInt($("#pf-pages").value, 10) || 0);
     S.prospects.push({id:"PR-" + String(S.prosSeq++).padStart(2, "0"), nom, secteur:$("#pf-secteur").value, commune:$("#pf-commune").value.trim() || "Kinshasa", contact, etape:"Premier contact", valeur:Math.round(pages * (S.tarifs.scan + S.tarifs.index)), pages, next:$("#pf-next").value || null, note:$("#pf-note").value.trim()});
     log("Nouveau prospect", nom, S.cur.client); toast(nom + " ajouté aux prospects"); render();
@@ -2630,12 +2697,14 @@ document.addEventListener("submit", e => {
     toast(clash ? "Mission planifiée. Attention : " + eq + " a déjà une sortie ce jour-là (" + clash.id + ")." : "Mission " + m.id + " planifiée"); render();
   } else if (id === "dep-form") {
     const montant = parseFloat($("#df-montant").value), lib = $("#df-lib").value.trim(), date = $("#df-date").value;
-    if (!(montant > 0) || !lib || !date) { toast("Renseignez la date, le libellé et un montant supérieur à zéro."); return; }
+    if (!date) return invalid("df-date", "Indiquez la date de la dépense.");
+    if (!lib) return invalid("df-lib", "Décrivez la dépense.");
+    if (!(montant > 0)) return invalid("df-montant", "Indiquez un montant supérieur à zéro.");
     S.depenses.push({id:"DP-" + String(S.depSeq++).padStart(3, "0"), date, cat:$("#df-cat").value, lib, montant:Math.round(montant * 100) / 100, mode:$("#df-mode").value});
     UI.depMois = date.slice(0, 7);
     log("Dépense", lib + " · " + usd(montant), S.cur.client); toast("Dépense enregistrée"); render();
   } else if (id === "lot-form") {
-    const titre = $("#lf-titre").value.trim(); if (!titre) { toast("Donnez un intitulé au lot."); return; }
+    const titre = $("#lf-titre").value.trim(); if (!titre) return invalid("lf-titre", "Donnez un intitulé au lot.");
     const max = S.lots.reduce((m, l) => Math.max(m, parseInt(l.id.split("-")[2], 10) || 0), 0);
     const lid = "LOT-" + TODAY.getFullYear() + "-" + String(max + 1).padStart(3, "0"), cid = $("#lf-client").value;
     const l = {id:lid, client:cid, titre, cartons:Math.max(1, parseInt($("#lf-cartons").value, 10) || 1), est:Math.max(1, parseInt($("#lf-pages").value, 10) || 1), scan:0, etape:0, recu:isoDay(TODAY), op:$("#lf-op").value.trim() || "Équipe A", garde:$("#lf-garde").checked, surSite:$("#lf-site").checked, facture:0, acompte:0, qc:null};
@@ -2647,6 +2716,7 @@ document.addEventListener("submit", e => {
 });
 document.addEventListener("change", e => {
   const t = e.target, id = t.id;
+  const before = (id === "bulk-tag" || id === "bulk-svc") && t.value ? JSON.stringify(S) : null;
   if (id === "sel-client") { S.cur.client = t.value; S.cur.user = ""; me(); UI = freshUI(); save(); render(); }
   else if (id === "sel-user") { S.cur.user = t.value; UI.sel = null; const u = me(); log("Connexion", u.nom + " (" + u.role + ")"); render(); }
   else if (id === "f-year") { UI.year = t.value; updateResults(); }
@@ -2694,16 +2764,26 @@ document.addEventListener("change", e => {
   else if (t.dataset.mis) { const m = S.missions.find(x => x.id === t.dataset.mis); m.statut = t.value; log("Mission", m.id + " → " + m.statut, m.client); toast(m.id + " : " + m.statut); render(); }
   else if (id === "dep-mois") { UI.depMois = t.value; render(); }
   if (t.closest && t.closest("#devis-form")) calcDevis();
+  if (before && JSON.stringify(S) !== before) offerUndo(before);
 });
 document.addEventListener("input", e => {
-  if (e.target.id === "q") { UI.q = e.target.value; updateResults(); }
+  if (e.target.getAttribute && e.target.getAttribute("aria-invalid") === "true") { e.target.removeAttribute("aria-invalid"); e.target.removeAttribute("aria-describedby"); const er = $("#" + e.target.id + "-err"); if (er) er.remove(); }
+  if (e.target.id === "q") { UI.q = e.target.value; UI.limit = 25; updateResults(); }
   else if (e.target.id === "pal-q") palRender(e.target.value);
   else if (e.target.closest && e.target.closest("#devis-form")) calcDevis();
 });
 document.addEventListener("keydown", e => {
   if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) { e.preventDefault(); openPalette(); return; }
   if (e.key === "?" && !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || "")) { e.preventDefault(); openHelp(); return; }
-  if (e.key === "Enter" && e.target.id === "pal-q") { e.preventDefault(); const f = $("#pal-list button"); if (f) f.click(); return; }
+  if ((e.key === "ArrowDown" || e.key === "ArrowUp") && e.target.id === "pal-q") { const bs = $$("#pal-list button"); if (bs.length) { e.preventDefault(); let k = bs.findIndex(x => x.classList.contains("on")); bs.forEach(x => x.classList.remove("on")); k = (k + (e.key === "ArrowDown" ? 1 : -1) + bs.length) % bs.length; bs[k].classList.add("on"); bs[k].scrollIntoView({block:"nearest"}); } return; }
+  if (e.key === "Enter" && e.target.id === "pal-q") { e.preventDefault(); const f = $("#pal-list button.on") || $("#pal-list button"); if (f) f.click(); return; }
+  if (e.key === "Tab") {
+    const box = $("#modal-root .modal") || ((UI.sel || UI.inv) && UI.tour == null ? $(".drawer") : null);
+    if (box) {
+      const f = Array.from(box.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')).filter(x => x.offsetParent !== null);
+      if (f.length) { const first = f[0], last = f[f.length - 1]; if (!box.contains(document.activeElement)) { e.preventDefault(); first.focus(); } else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); } }
+    }
+  }
   if (e.key === "Enter" && e.target.matches && e.target.matches("tr[data-act=open]")) { e.target.click(); return; }
   if (e.key === "/" && !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || "") && mode() === "client" && !UI.sel) {
     e.preventDefault();
@@ -2712,12 +2792,12 @@ document.addEventListener("keydown", e => {
     return;
   }
   if (e.key !== "Escape") return;
-  if ($("#modal-root").innerHTML) $("#modal-root").innerHTML = "";
-  else if (UI.sel || UI.inv) { UI.sel = null; UI.inv = null; UI.share = null; UI.req = null; renderDrawer(); }
+  if ($("#modal-root").innerHTML) { $("#modal-root").innerHTML = ""; restoreFocus(); }
+  else if (UI.sel || UI.inv) { UI.sel = null; UI.inv = null; UI.share = null; UI.req = null; renderDrawer(); restoreFocus(); }
   else if (UI.notif) { UI.notif = false; render(); }
   else if (UI.tour != null) tourGo(-1);
 });
-window.addEventListener("hashchange", () => { UI.sel = mode() === "client" ? UI.sel : null; UI.inv = null; render(); });
+window.addEventListener("hashchange", () => { UI.sel = mode() === "client" ? UI.sel : null; UI.inv = null; UI.menu = false; render(); window.scrollTo(0, 0); });
 render();
 })();
 </script>

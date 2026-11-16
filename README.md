@@ -13,7 +13,11 @@ Ce dépôt contient la **démonstration interactive** de la plateforme. C'est un
 
 Les données sont des exemples. Vos modifications restent dans votre navigateur. Le bouton « Réinitialiser la démo », en bas du menu, rétablit les données de départ.
 
-Pour une présentation, cliquez sur **« Lancer la visite guidée »** : 11 étapes font le tour de la plateforme.
+Pour une présentation, cliquez sur **« Lancer la visite guidée »** : 11 étapes font le tour de la plateforme. Sur téléphone, le bouton se trouve dans le « Menu ».
+
+Le bouton « Sauvegarder ou restaurer la démo » permet de copier les données de la démo pour les retrouver sur un autre appareil.
+
+**Sécurité :** la démo ne doit jamais recevoir de vrais documents. Voir [SECURITE.md](SECURITE.md) pour l'analyse complète et les exigences de la version réelle.
 
 ## Les modules
 
@@ -83,5 +87,6 @@ Pour démarrer vite, la version serveur peut s'appuyer sur un logiciel libre de 
 
 - Une seule page HTML, avec CSS et JavaScript intégrés, sans dépendance à installer.
 - Polices chargées depuis Google Fonts. Bibliothèque `qrcode-generator` chargée depuis cdnjs pour les QR codes ; sans elle, la page affiche le code à la place.
-- Interface en français, adaptée au téléphone, thèmes clair et sombre.
+- Interface en français, adaptée au téléphone (menu repliable), thèmes clair et sombre.
+- Qualité : annulation des actions sensibles, messages d'erreur sous les champs, navigation au clavier (`/`, `Ctrl K`, `?`), fenêtres accessibles, affichage par paquets de 25 documents, mise en page pour l'impression.
 - Données de démonstration enregistrées dans le stockage local du navigateur.
